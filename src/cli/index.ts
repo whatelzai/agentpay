@@ -20,6 +20,16 @@ program
   });
 
 program
+  .command("list-products")
+  .description(
+    "List the canonical AgentPay demo catalog — merchant + product URLs the agent should fetch before proposing.",
+  )
+  .option("-e, --endpoint <url>", "MCP endpoint URL", DEFAULT_ENDPOINT)
+  .action(async (opts: { endpoint: string }) => {
+    await callTool(opts.endpoint, "list_products", {});
+  });
+
+program
   .command("propose")
   .description(
     "Propose a purchase — prints a confirmation URL for the user to open and sign.",
