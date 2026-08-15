@@ -1,243 +1,233 @@
-const coreMetrics = [
-  {
-    label: "Unauthorized Mint Escape Rate",
-    target: "0.00%",
-    formula: "unauthorized mints that succeeded / total mint attempts",
-    why: "This is the single most important safety number. If an unauthorized spend escapes, AgentPay failed the trust contract.",
-  },
-  {
-    label: "Mismatch Block Rate",
-    target: "> 99% when request diverges",
-    formula: "divergent mint requests refused / divergent mint requests detected",
-    why: "Measures whether the binding layer actually stops unsafe execution when the agent asks for something different from what the user signed.",
-  },
-  {
-    label: "Intent Fidelity Rate",
-    target: "> 99.9%",
-    formula: "mint requests matching signed merchant+amount / total mint requests",
-    why: "Shows how often the system preserves the exact commercial intent the human approved.",
-  },
-  {
-    label: "False Refusal Rate",
-    target: "< 1%",
-    formula: "safe transactions refused / total safe transactions",
-    why: "Safety without usability becomes abandonment. We need to protect the user without blocking normal purchases too often.",
-  },
-  {
-    label: "Time-to-Authorize",
-    target: "< 60s median",
-    formula: "time from confirmation URL open to mint authorization result",
-    why: "If SAFE is too slow, users will route around it. Fast protection is part of the product.",
-  },
-  {
-    label: "Blast Radius per Incident",
-    target: "1 merchant, 1 amount, 1 session max",
-    formula: "max scope of a compromised or divergent agent action",
-    why: "Even when something goes wrong, the loss surface must stay tightly bounded.",
-  },
-] as const;
+import Link from "next/link";
+import { fetchKpiSnapshot } from "@/src/lib/supabase/server";
 
-const safeLooksLike = [
-  "The user signs one merchant, one amount, one expiry, one nonce.",
-  "The agent can only mint against exactly what the user signed.",
-  "A changed merchant or changed amount is refused automatically.",
-  "A stale or replayed confirmation token expires and cannot be reused.",
-  "Any failure is visible and attributable instead of silently moving money.",
-] as const;
+export const revalidate = 300;
 
-const unsafeLooksLike = [
-  "The agent shows one purchase but mints for another.",
-  "A prompt-injected tool, page, peer agent, or memory mutation changes spend after confirmation.",
-  "A confirmation token can be replayed outside its intended session window.",
-  "The system approves money movement without a cryptographic match to user intent.",
-  "One bad decision opens a wider spend surface than the single intended purchase.",
-] as const;
-
-const positiveBenefits = [
-  "Users can delegate spending without handing over open-ended financial authority.",
-  "Partners can prove that human-approved intent and actual execution stayed aligned.",
-  "Fraud review becomes auditable because every approved spend has a signed ground truth.",
-  "Prompt-injection incidents become contained refusals instead of real money loss.",
-] as const;
-
-const negativeConsequences = [
-  "Unauthorized purchases complete even though the human approved something else.",
-  "Trust in the product collapses because users no longer believe confirmation means control.",
-  "Merchants, rails, and partners inherit dispute, refund, and reputational overhead.",
-  "The product becomes a credential router instead of a trust layer, which breaks the north star.",
-] as const;
-
-function StatusChip({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "safe" | "unsafe" | "neutral";
-}) {
-  const className =
-    tone === "safe"
-      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-      : tone === "unsafe"
-        ? "border-red-500/30 bg-red-500/10 text-red-300"
-        : "border-amber-500/30 bg-amber-500/10 text-amber-200";
-
+function Mark({ className = "" }: { className?: string }) {
   return (
-    <span
-      className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${className}`}
+    <svg
+      viewBox="0 0 32 32"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      className={className}
+      aria-hidden="true"
     >
-      {label}
-    </span>
+      <path
+        d="M4 10 C 10 14, 14 20, 22 22"
+        stroke="currentColor"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+      />
+      <circle cx="24" cy="22" r="3.25" fill="#39FF14" />
+    </svg>
   );
 }
 
-export default function MonitorPage() {
+function Kicker({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen bg-neutral-950 text-white">
-      <section className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(251,191,36,0.12),_transparent_24%),linear-gradient(180deg,_rgba(10,10,10,0.92),_rgba(10,10,10,1))]">
-        <div className="mx-auto max-w-6xl px-6 py-20 md:px-8 md:py-24">
-          <div className="flex flex-wrap items-center gap-3">
-            <StatusChip label="Public Monitor" tone="safe" />
-            <StatusChip label="North Star: Spend Safely" tone="neutral" />
-          </div>
-          <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight md:text-6xl">
-            SAFE means money moves only where the human signed.
-          </h1>
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-neutral-300">
-            AgentPay exists to reduce unauthorized agent spend to zero while
-            keeping normal purchases fast and usable. This page is our public
-            operating definition of SAFE, UNSAFE, and the numbers that tell us
-            whether we are winning or failing.
-          </p>
-        </div>
+    <p className="text-[11px] tracking-[0.22em] uppercase text-muted font-mono flex items-center gap-3">
+      <span className="w-8 h-px bg-neon" aria-hidden="true" />
+      {children}
+    </p>
+  );
+}
+
+const safeLine = [
+  "One merchant, one amount, one expiry, one nonce — signed by the human.",
+  "The agent can only mint against what the human signed.",
+  "A changed merchant or amount is refused before money moves.",
+  "A stale or replayed token expires and cannot be reused.",
+  "Every refusal is a signed record — auditable, attributable.",
+] as const;
+
+const unsafeLine = [
+  "The agent shows one purchase and mints another.",
+  "Prompt injection mutates spend after the human confirmed.",
+  "A confirmation token is replayed outside its session window.",
+  "Money moves without a cryptographic match to human intent.",
+  "One bad decision widens the spend surface past the intended purchase.",
+] as const;
+
+export default async function MonitorPage() {
+  const kpi = await fetchKpiSnapshot();
+  const windowDays = kpi?.window_days ?? 30;
+
+  const cards = [
+    {
+      label: "Unauthorized",
+      value: kpi ? kpi.unauthorized_spends.toString() : "0",
+      note: "Rail-authorized mints whose executed tuple diverged from the signed tuple. Structurally impossible when the binding holds — this is the escape metric.",
+      target: "target: 0",
+      onTarget: (kpi?.unauthorized_spends ?? 0) === 0,
+    },
+    {
+      label: "Attacks blocked",
+      value: kpi ? kpi.attacks_blocked.toString() : "0",
+      note: "Every time Binding.verify() rejected — tuple mismatch, expired confirmation, wrong signer, or a replayed nonce.",
+      target: `last ${windowDays}d`,
+      onTarget: true,
+    },
+    {
+      label: "Median sign",
+      value:
+        kpi?.median_sign_time_ms != null
+          ? `${(kpi.median_sign_time_ms / 1000).toFixed(1)}s`
+          : "—",
+      note: "Wall-clock median from a confirmation page opening to the human signing it. Slow safety is skipped safety.",
+      target: "target: <60s",
+      onTarget:
+        kpi?.median_sign_time_ms == null ||
+        kpi.median_sign_time_ms <= 60_000,
+    },
+  ];
+
+  return (
+    <main className="bg-void text-ink">
+      {/* Top bar (matches homepage) */}
+      <header className="max-w-6xl mx-auto px-6 md:px-10 pt-6 md:pt-8 flex items-center justify-between">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-ink hover:text-neon transition-colors"
+          aria-label="AgentPay home"
+        >
+          <Mark className="w-6 h-6" />
+          <span className="font-mono text-sm tracking-[0.14em] uppercase">
+            agentpay
+          </span>
+        </Link>
+        <nav className="flex items-center gap-6 text-xs font-mono uppercase tracking-[0.14em]">
+          <Link href="/" className="text-muted hover:text-neon transition-colors">
+            Home
+          </Link>
+          <a
+            href="https://github.com/whatelzai/agentpay"
+            className="text-muted hover:text-neon transition-colors"
+          >
+            GitHub
+          </a>
+        </nav>
+      </header>
+
+      {/* Hero */}
+      <section className="max-w-6xl mx-auto px-6 md:px-10 pt-24 md:pt-32 pb-16">
+        <Kicker>Public scorecard · rolling {windowDays}d</Kicker>
+        <h1 className="mt-6 font-body font-semibold text-4xl md:text-6xl tracking-[-0.03em] leading-[1.05] max-w-3xl">
+          Money moves only where the human{" "}
+          <span className="text-neon">signed</span>.
+        </h1>
+        <p className="mt-6 max-w-2xl text-lg text-muted leading-relaxed">
+          AgentPay drives unauthorized agent spend to zero without slowing
+          legitimate purchases. These are the numbers that tell us whether the
+          binding is holding.
+        </p>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-16 md:px-8">
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-8">
-            <div className="flex items-center gap-3">
-              <StatusChip label="SAFE" tone="safe" />
-            </div>
-            <p className="mt-5 text-2xl font-semibold">
-              A safe transaction preserves intent fidelity end to end.
-            </p>
-            <p className="mt-4 text-sm leading-7 text-neutral-300">
-              The signed commercial intent and the executed commercial action
-              are the same merchant, the same amount, and the same bounded
-              session.
-            </p>
-            <ul className="mt-6 space-y-3 text-sm leading-7 text-neutral-200">
-              {safeLooksLike.map((item) => (
-                <li key={item} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-8">
-            <div className="flex items-center gap-3">
-              <StatusChip label="UNSAFE" tone="unsafe" />
-            </div>
-            <p className="mt-5 text-2xl font-semibold">
-              An unsafe transaction lets execution drift away from approval.
-            </p>
-            <p className="mt-4 text-sm leading-7 text-neutral-300">
-              If the agent, toolchain, or context can mutate spend after the
-              user confirms, the system is unsafe even if most transactions
-              still look normal.
-            </p>
-            <ul className="mt-6 space-y-3 text-sm leading-7 text-neutral-200">
-              {unsafeLooksLike.map((item) => (
-                <li key={item} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-6 pb-8 md:px-8">
-        <div className="rounded-[2rem] border border-white/10 bg-neutral-900/70 p-8 backdrop-blur">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-[0.22em] text-neutral-500">
-                Safety Scorecard
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-                The numbers that define success
-              </h2>
-            </div>
-            <p className="max-w-xl text-sm leading-6 text-neutral-400">
-              These are the metrics we should publish, review weekly, and wire
-              into telemetry next. Until live data exists, the targets define
-              the standard we are committing to.
-            </p>
-          </div>
-
-          <div className="mt-8 overflow-hidden rounded-3xl border border-white/10">
-            <div className="grid grid-cols-1 border-b border-white/10 bg-white/[0.03] px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500 md:grid-cols-[1.2fr_0.75fr_1fr_1.15fr]">
-              <div>Metric</div>
-              <div className="mt-2 md:mt-0">Target</div>
-              <div className="mt-2 md:mt-0">Formula</div>
-              <div className="mt-2 md:mt-0">Why It Matters</div>
-            </div>
-            {coreMetrics.map((metric) => (
-              <div
-                key={metric.label}
-                className="grid grid-cols-1 gap-3 border-b border-white/10 px-5 py-5 text-sm last:border-b-0 md:grid-cols-[1.2fr_0.75fr_1fr_1.15fr] md:gap-6"
-              >
-                <div className="font-medium text-white">{metric.label}</div>
-                <div className="text-emerald-300">{metric.target}</div>
-                <div className="text-neutral-400">{metric.formula}</div>
-                <div className="text-neutral-300">{metric.why}</div>
+      {/* Live KPIs */}
+      <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 border-t border-rule">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-14">
+          {cards.map((c) => (
+            <div key={c.label} className="border-t border-ink/40 pt-6">
+              <div className="flex items-center justify-between mb-6">
+                <p className="text-[10px] tracking-[0.22em] uppercase text-muted font-mono">
+                  {c.label}
+                </p>
+                <span
+                  className={`text-[9px] tracking-[0.18em] uppercase font-mono px-2 py-0.5 border ${
+                    c.onTarget
+                      ? "border-neon/40 text-neon"
+                      : "border-rule text-muted"
+                  }`}
+                >
+                  {c.onTarget ? "on target" : "off target"}
+                </span>
               </div>
-            ))}
+              <p className="font-body font-semibold text-6xl md:text-7xl text-ink tabular-nums leading-none mb-6 tracking-[-0.04em]">
+                {c.value}
+              </p>
+              <p className="text-sm text-ink/70 leading-relaxed mb-3">
+                {c.note}
+              </p>
+              <p className="text-[10px] tracking-[0.18em] uppercase text-muted font-mono">
+                {c.target}
+              </p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-14 text-[11px] tracking-[0.18em] uppercase text-muted font-mono">
+          data refreshed every 5 min · numbers stream from execute_purchase and
+          confirmation-signing events
+        </p>
+      </section>
+
+      {/* SAFE / UNSAFE definitions */}
+      <section className="max-w-6xl mx-auto px-6 md:px-10 py-24 border-t border-rule">
+        <Kicker>Definitions</Kicker>
+        <h2 className="mt-6 font-body font-semibold text-3xl md:text-4xl tracking-[-0.03em] mb-14">
+          What we call safe. What we call unsafe.
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+          <div>
+            <p className="text-[10px] tracking-[0.22em] uppercase font-mono text-neon mb-6">
+              Safe
+            </p>
+            <ul className="space-y-4">
+              {safeLine.map((line) => (
+                <li
+                  key={line}
+                  className="flex gap-3 text-sm text-ink/80 leading-relaxed"
+                >
+                  <span className="text-neon font-mono select-none">✓</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-[10px] tracking-[0.22em] uppercase font-mono text-muted mb-6">
+              Unsafe
+            </p>
+            <ul className="space-y-4">
+              {unsafeLine.map((line) => (
+                <li
+                  key={line}
+                  className="flex gap-3 text-sm text-ink/80 leading-relaxed"
+                >
+                  <span className="text-muted font-mono select-none">✗</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-6xl gap-6 px-6 py-8 md:grid-cols-2 md:px-8">
-        <div className="rounded-3xl border border-white/10 bg-neutral-900 p-8">
-          <p className="text-sm font-medium uppercase tracking-[0.22em] text-neutral-500">
-            Benefits of SAFE
-          </p>
-          <ul className="mt-6 space-y-3 text-sm leading-7 text-neutral-300">
-            {positiveBenefits.map((item) => (
-              <li key={item} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-3xl border border-white/10 bg-neutral-900 p-8">
-          <p className="text-sm font-medium uppercase tracking-[0.22em] text-neutral-500">
-            Consequences of UNSAFE
-          </p>
-          <ul className="mt-6 space-y-3 text-sm leading-7 text-neutral-300">
-            {negativeConsequences.map((item) => (
-              <li key={item} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {/* Operating rule */}
+      <section className="max-w-6xl mx-auto px-6 md:px-10 py-24 border-t border-rule">
+        <Kicker>Operating rule</Kicker>
+        <p className="mt-6 max-w-3xl text-xl md:text-2xl leading-relaxed text-ink/90">
+          Safety gates pass first. Utility comes second. Adoption comes third.
+          A blocked attack is evidence the control worked. An unauthorized
+          escape is the incident that matters.
+        </p>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-8 md:px-8 md:pb-20">
-        <div className="rounded-[2rem] border border-amber-500/20 bg-amber-500/5 p-8">
-          <p className="text-sm font-medium uppercase tracking-[0.22em] text-amber-200">
-            Operating Rule
-          </p>
-          <p className="mt-4 max-w-4xl text-xl leading-8 text-neutral-100">
-            AgentPay is successful when unsafe intent drift is driven toward
-            zero without making legitimate purchases painful. If we cannot prove
-            that with metrics, then “spend safely” is still a slogan, not an
-            operating system.
-          </p>
-        </div>
-      </section>
+      {/* Footer */}
+      <footer className="max-w-6xl mx-auto px-6 md:px-10 py-10 border-t border-rule flex flex-wrap items-center justify-between gap-4">
+        <p className="text-[11px] text-muted flex items-center gap-2 font-mono uppercase tracking-[0.14em]">
+          <Mark className="w-4 h-4" />
+          agentpay · signed at{" "}
+          <a
+            href="https://straitsx.com"
+            className="hover:text-neon transition-colors"
+          >
+            StraitsX AgentiX Playground
+          </a>{" "}
+          · SG · 14–16 Aug 2026
+        </p>
+        <p className="text-[10px] tracking-[0.18em] uppercase text-muted font-mono">
+          Track: Agentic Payments Infrastructure
+        </p>
+      </footer>
     </main>
   );
 }
