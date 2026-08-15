@@ -1,165 +1,162 @@
-export default function Home() {
+import { HeroConnect } from "./_components/HeroConnect";
+import { FeedbackForm } from "./_components/FeedbackForm";
+import { fetchKpiSnapshot } from "@/src/lib/supabase/server";
+
+// Revalidate the page every 5 minutes so KPI numbers refresh without a rebuild.
+export const revalidate = 300;
+
+export default async function Home() {
+  const kpi = await fetchKpiSnapshot();
+
+  const cards = [
+    {
+      label: "Unauthorized spends",
+      value: kpi ? kpi.unauthorized_spends.toString() : "—",
+      target: "target: 0",
+      meaning:
+        "Every completed payment on AgentPay leaves a signed intent the mint layer verifies. If any payment ever moved money without a matching human signature, this counts it. Anything above zero is a safety incident.",
+    },
+    {
+      label: "Attacks blocked at mint",
+      value: kpi ? kpi.attacks_blocked.toString() : "—",
+      target: `last ${kpi?.window_days ?? 30} days`,
+      meaning:
+        "Prompt-injected or adversarial mint requests refused at the binding gate. The agent asked to spend on a merchant or amount the human never signed for — AgentPay refused before money moved.",
+    },
+    {
+      label: "Intent fidelity",
+      value:
+        kpi?.intent_fidelity_pct != null
+          ? `${kpi.intent_fidelity_pct.toFixed(1)}%`
+          : "—",
+      target: "target: 100%",
+      meaning:
+        "Of every payment that completed, the share where the executed (merchant, amount) matched the human's signed intent exactly. Under 100% means at least one drift got through — a Red state on the Safety Scorecard.",
+    },
+    {
+      label: "Median sign time",
+      value:
+        kpi?.median_sign_time_ms != null
+          ? `${(kpi.median_sign_time_ms / 1000).toFixed(1)}s`
+          : "—",
+      target: "target: <60s",
+      meaning:
+        "Wall-clock median from opening a confirmation to signing it. Safety infrastructure only works if people actually use it — slow confirmations get abandoned, which is a different kind of failure.",
+    },
+  ];
+
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="max-w-3xl mx-auto px-6 py-24 md:py-32">
+      {/* Section 1 — Hero */}
+      <section className="max-w-3xl mx-auto px-6 pt-24 pb-16 md:pt-32">
         <p className="text-sm font-medium text-emerald-400 mb-4 tracking-wider uppercase">
           AgentPay
         </p>
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-8 leading-[1.05]">
-          The trust layer<br />
-          that makes AI<br />
+          The trust layer
+          <br />
+          that makes AI
+          <br />
           <span className="text-emerald-400">spend safely.</span>
         </h1>
-        <p className="text-xl text-neutral-400 max-w-2xl leading-relaxed mb-16">
-          Cryptographic confirmation binding for AI-agent payments. Cards handle credential theft. AgentPay closes the prompt-injection gap the card layer alone cannot.
+        <p className="text-xl text-neutral-400 max-w-2xl leading-relaxed mb-12">
+          Cryptographic confirmation binding for AI-agent payments. Cards
+          handle credential theft. AgentPay closes the prompt-injection gap the
+          card layer alone cannot.
         </p>
-        <p className="text-sm text-neutral-500 leading-relaxed mb-16">
-          Built at the{" "}
-          <a
-            href="https://straitsx.com"
-            className="underline underline-offset-4 hover:text-neutral-300"
-          >
-            StraitsX AgentiX Playground
-          </a>
-          , Singapore — 14–16 August 2026. Track: Agentic Payments Infrastructure.
+        <HeroConnect />
+      </section>
+
+      {/* Section 2 — KPI cards */}
+      <section className="max-w-5xl mx-auto px-6 py-16 border-t border-neutral-800">
+        <p className="text-sm font-medium text-neutral-500 mb-4 tracking-wider uppercase">
+          Public scorecard
         </p>
-
-        <div className="mb-16 flex flex-wrap gap-3">
-          <a
-            href="/monitor"
-            className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20"
-          >
-            View public safety monitor
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
+          The numbers we hold ourselves to.
+        </h2>
+        <p className="text-sm text-neutral-500 mb-8">
+          Rolling {kpi?.window_days ?? 30}-day window.{" "}
+          {kpi ? (
+            <>
+              Refreshed{" "}
+              <time dateTime={kpi.as_of}>
+                {new Date(kpi.as_of).toUTCString()}
+              </time>
+              . Full breakdown at{" "}
+            </>
+          ) : (
+            "Numbers unavailable — full breakdown at "
+          )}
+          <a href="/monitor" className="text-emerald-400 hover:underline">
+            /monitor
           </a>
+          .
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {cards.map((c) => (
+            <div
+              key={c.label}
+              className="border border-neutral-800 rounded p-5 bg-neutral-950"
+            >
+              <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">
+                {c.label}
+              </p>
+              <p className="text-4xl font-bold text-white mb-1 tabular-nums">
+                {c.value}
+              </p>
+              <p className="text-xs text-neutral-600">{c.target}</p>
+            </div>
+          ))}
         </div>
+      </section>
 
-        <div className="pt-16 border-t border-neutral-800">
-          <p className="text-sm font-medium text-neutral-500 mb-4 tracking-wider uppercase">
-            Connect your agent
-          </p>
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
-            Point Claude or Codex at the AgentPay MCP.
-          </h2>
-          <p className="text-sm text-neutral-500 mb-8">
-            HTTP endpoint (Streamable HTTP transport):{" "}
-            <code className="text-emerald-400 text-xs">
-              https://agentpay-tan.vercel.app/api/mcp
-            </code>
-          </p>
-
-          <div className="space-y-10">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Claude.ai</h3>
-              <p className="text-sm text-neutral-500 mb-4">
-                Web or desktop app. Requires a Pro, Max, Team, or Enterprise plan.
-              </p>
-              <ol className="text-sm text-neutral-400 space-y-2 list-decimal list-inside">
-                <li>
-                  Open <span className="text-neutral-300">Settings</span> in the
-                  sidebar
-                </li>
-                <li>
-                  Navigate to{" "}
-                  <span className="text-neutral-300">Connectors</span> →{" "}
-                  <span className="text-neutral-300">Add custom connector</span>
-                </li>
-                <li>
-                  Configure:
-                  <ul className="ml-6 mt-2 space-y-1 list-disc list-outside text-neutral-400">
-                    <li>
-                      Name:{" "}
-                      <code className="text-emerald-400 text-xs">AgentPay</code>
-                    </li>
-                    <li>
-                      Remote MCP server URL:{" "}
-                      <code className="text-emerald-400 text-xs">
-                        https://agentpay-tan.vercel.app/api/mcp
-                      </code>
-                    </li>
-                  </ul>
-                </li>
-                <li>
-                  Click <span className="text-neutral-300">Add</span>. The
-                  connector shows in every conversation.
-                </li>
-              </ol>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Codex app</h3>
-              <ol className="text-sm text-neutral-400 space-y-2 list-decimal list-inside">
-                <li>
-                  Open{" "}
-                  <span className="text-neutral-300">Plugins</span> →{" "}
-                  <span className="text-neutral-300">MCPs</span> →{" "}
-                  <span className="text-neutral-300">Add</span>
-                </li>
-                <li>
-                  Select{" "}
-                  <span className="text-neutral-300">
-                    Connect to a custom MCP
-                  </span>
-                </li>
-                <li>
-                  Configure:
-                  <ul className="ml-6 mt-2 space-y-1 list-disc list-outside text-neutral-400">
-                    <li>
-                      Name:{" "}
-                      <code className="text-emerald-400 text-xs">AgentPay</code>
-                    </li>
-                    <li>
-                      Type:{" "}
-                      <span className="text-neutral-300">Streamable HTTP</span>
-                    </li>
-                    <li>
-                      URL:{" "}
-                      <code className="text-emerald-400 text-xs">
-                        https://agentpay-tan.vercel.app/api/mcp
-                      </code>
-                    </li>
-                  </ul>
-                </li>
-                <li>Save. AgentPay tools appear in the composer.</li>
-              </ol>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Terminal / CLI</h3>
-              <p className="text-sm text-neutral-500 mb-4">
-                For Claude Code, Codex CLI, or any terminal-based agent. Node
-                20+ required.
-              </p>
-              <pre className="bg-neutral-900 border border-neutral-800 rounded p-4 text-xs text-neutral-300 overflow-x-auto">
-                {`npm install -g @aisystemresources/agentpay
-
-# health check
-agentpay ping
-
-# propose a purchase — get a signed confirmation URL
-agentpay propose -m "Starbucks" -a 5.50
-
-# after signing, execute with the sealed capability
-agentpay execute -t <sealed-capability> -m "Starbucks" -a 5.50`}
-              </pre>
-              <p className="text-sm text-neutral-500 mt-3">
-                Or one-shot without install:{" "}
-                <code className="text-emerald-400 text-xs">
-                  npx -p @aisystemresources/agentpay agentpay ping
-                </code>
+      {/* Section 3 — Meanings */}
+      <section className="max-w-3xl mx-auto px-6 py-16 border-t border-neutral-800">
+        <p className="text-sm font-medium text-neutral-500 mb-4 tracking-wider uppercase">
+          What these numbers mean
+        </p>
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-8">
+          Safety first, then usefulness.
+        </h2>
+        <div className="space-y-8">
+          {cards.map((c) => (
+            <div key={c.label}>
+              <h3 className="text-lg font-semibold mb-2 text-emerald-400">
+                {c.label}
+              </h3>
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                {c.meaning}
               </p>
             </div>
-          </div>
-
-          <p className="text-sm text-neutral-500 mt-8">
-            Then ask your agent:{" "}
-            <em className="text-neutral-300">
-              &ldquo;Use the AgentPay ping tool to confirm the server is
-              connected.&rdquo;
-            </em>{" "}
-            You should see a version string and the transport mode.
-          </p>
+          ))}
         </div>
-      </div>
+      </section>
+
+      {/* Section 4 — Feedback */}
+      <section className="max-w-3xl mx-auto px-6 py-16 border-t border-neutral-800">
+        <p className="text-sm font-medium text-neutral-500 mb-4 tracking-wider uppercase">
+          Drop a comment
+        </p>
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4">
+          Tell us what&apos;s missing.
+        </h2>
+        <p className="text-sm text-neutral-500 mb-6">
+          Rough edges, feature asks, security concerns — we read every one.
+        </p>
+        <FeedbackForm />
+      </section>
+
+      <footer className="max-w-3xl mx-auto px-6 py-8 border-t border-neutral-800 text-xs text-neutral-600">
+        Built at the{" "}
+        <a
+          href="https://straitsx.com"
+          className="underline underline-offset-4 hover:text-neutral-400"
+        >
+          StraitsX AgentiX Playground
+        </a>
+        , Singapore — 14–16 August 2026. Track: Agentic Payments Infrastructure.
+      </footer>
     </main>
   );
 }
