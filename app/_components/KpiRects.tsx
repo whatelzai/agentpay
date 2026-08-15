@@ -1,6 +1,10 @@
+import Link from "next/link";
+import { getMonitorMetric, type MonitorMetricSlug } from "@/src/lib/monitor-metrics";
 import type { KpiSnapshot } from "@/src/lib/supabase/server";
 
 export type KpiRect = {
+  slug: MonitorMetricSlug;
+  href: string;
   label: string;
   value: string;
   note: string;
@@ -16,7 +20,9 @@ export function buildKpiRects(kpi: KpiSnapshot | null): KpiRect[] {
 
   return [
     {
-      label: "Safety incidents",
+      slug: "safety-incidents",
+      href: "/monitor/safety-incidents",
+      label: getMonitorMetric("safety-incidents")!.label,
       value: kpi && hasSample ? kpi.unauthorized_spends.toString() : "—",
       note: "Confirmed or unresolved post-payment events requiring review",
       target: "target: 0",
@@ -34,7 +40,9 @@ export function buildKpiRects(kpi: KpiSnapshot | null): KpiRect[] {
             : "danger",
     },
     {
-      label: "Safety refusals",
+      slug: "safety-refusals",
+      href: "/monitor/safety-refusals",
+      label: getMonitorMetric("safety-refusals")!.label,
       value: kpi && hasSample ? kpi.attacks_blocked.toString() : "—",
       note: "All fail-closed refusals, including invalid capabilities",
       target: `last ${windowDays}d`,
@@ -42,7 +50,9 @@ export function buildKpiRects(kpi: KpiSnapshot | null): KpiRect[] {
       tone: !kpi || !hasSample ? "unavailable" : "neutral",
     },
     {
-      label: "Intent fidelity",
+      slug: "intent-fidelity",
+      href: "/monitor/intent-fidelity",
+      label: getMonitorMetric("intent-fidelity")!.label,
       value:
         kpi?.intent_fidelity_pct != null && hasExecutedOutcomes
           ? `${kpi.intent_fidelity_pct.toFixed(1)}%`
@@ -63,7 +73,9 @@ export function buildKpiRects(kpi: KpiSnapshot | null): KpiRect[] {
             : "danger",
     },
     {
-      label: "Median sign",
+      slug: "median-sign",
+      href: "/monitor/median-sign",
+      label: getMonitorMetric("median-sign")!.label,
       value:
         kpi?.median_sign_time_ms != null
           ? `${(kpi.median_sign_time_ms / 1000).toFixed(1)}s`
@@ -98,9 +110,11 @@ export function KpiRects({ items }: { items: KpiRect[] }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {items.map((c) => (
-        <div
+        <Link
           key={c.label}
-          className="border border-rule bg-void flex flex-col p-7 min-h-[280px]"
+          href={c.href}
+          aria-label={`${c.label}: ${c.value}. How is this calculated?`}
+          className="group border border-rule bg-void flex flex-col p-7 min-h-[310px] transition-[border-color,background-color,transform] duration-300 hover:border-neon/60 hover:bg-ink/[0.025] focus-visible:outline-none focus-visible:border-neon focus-visible:ring-1 focus-visible:ring-neon/40 md:hover:-translate-y-1"
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="text-neon font-mono text-sm tracking-[0.18em] uppercase font-semibold">
@@ -121,7 +135,16 @@ export function KpiRects({ items }: { items: KpiRect[] }) {
           <p className="text-[10px] tracking-[0.18em] uppercase text-muted font-mono">
             {c.target}
           </p>
-        </div>
+          <div className="mt-5 pt-4 border-t border-rule flex items-center justify-between gap-4 text-[10px] tracking-[0.14em] uppercase font-mono text-neon opacity-70 transition-all duration-300 md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0 md:group-focus-visible:opacity-100 md:group-focus-visible:translate-y-0 motion-reduce:transform-none motion-reduce:transition-none">
+            <span>How is this calculated?</span>
+            <span
+              aria-hidden="true"
+              className="text-base transition-transform duration-300 group-hover:translate-x-1 motion-reduce:transform-none"
+            >
+              ↗
+            </span>
+          </div>
+        </Link>
       ))}
     </div>
   );
