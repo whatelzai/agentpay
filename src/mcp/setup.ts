@@ -40,7 +40,7 @@ export const AGENTPAY_TOOLS = [
         },
         amount_sgd: {
           type: "number",
-          description: "Amount in SGD.",
+          description: "Amount in SGD. The card rail accepts 5–30 SGD.",
         },
         expiry_seconds: {
           type: "number",
@@ -54,7 +54,7 @@ export const AGENTPAY_TOOLS = [
   {
     name: "execute_purchase",
     description:
-      "Execute a confirmed purchase: mint a scoped virtual card against a signed confirmation_token. Decodes the token, recovers the signer, verifies expiry, and asserts the (merchant, amount_sgd) in the mint request match the signed values. Mismatch → refuses the mint with a visible diff. This is the prompt-injection defence layer: even if the agent's context was hijacked between signature and mint, the money can only move where the human cryptographically signed.",
+      "Execute a confirmed purchase: mint a scoped virtual card against a signed confirmation_token. Decodes the token, recovers the signer, verifies expiry and owner, refuses replayed tokens, and asserts the (merchant, amount_sgd) in the mint request match the signed values. Mismatch → refuses the mint with a visible diff and a logged Block Receipt. On success returns {authorized, amount_sgd, settlement_tx, snowtrace_url} — card credentials are never returned to the agent; the human views the card separately. This is the prompt-injection defence layer: even if the agent's context was hijacked between signature and mint, the money can only move where the human cryptographically signed.",
     inputSchema: {
       type: "object" as const,
       properties: {
