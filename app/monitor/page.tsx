@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { BlocksTable } from "../_components/BlocksTable";
 import { buildKpiRects, KpiRects } from "../_components/KpiRects";
+import {
+  SectionKicker,
+  SiteFooter,
+  SiteHeader,
+  siteFrameClassName,
+} from "../_components/SiteChrome";
 import { getMonitorEnvironment } from "@/src/lib/monitor";
 import { fetchKpiSnapshot } from "@/src/lib/supabase/server";
 import { fetchRecentBlocks } from "@/src/lib/telemetry";
@@ -13,35 +18,6 @@ export const metadata: Metadata = {
   description:
     "Public evidence for AgentPay safety, utility, telemetry health, and signed-intent refusals.",
 };
-
-function Mark({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        d="M4 10 C 10 14, 14 20, 22 22"
-        stroke="currentColor"
-        strokeWidth="2.25"
-        strokeLinecap="round"
-      />
-      <circle cx="24" cy="22" r="3.25" fill="#39FF14" />
-    </svg>
-  );
-}
-
-function Kicker({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] tracking-[0.22em] uppercase text-muted font-mono flex items-center gap-3">
-      <span className="w-8 h-px bg-neon" aria-hidden="true" />
-      {children}
-    </p>
-  );
-}
 
 const safeLine = [
   "One merchant, one amount, one expiry, one nonce — signed by the human.",
@@ -98,33 +74,13 @@ export default async function MonitorPage() {
 
   return (
     <main className="bg-void text-ink">
-      <header className="max-w-6xl mx-auto px-6 md:px-10 pt-6 md:pt-8 flex items-center justify-between">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-ink hover:text-neon transition-colors"
-          aria-label="AgentPay home"
-        >
-          <Mark className="w-6 h-6" />
-          <span className="font-mono text-sm tracking-[0.14em] uppercase">
-            agentpay
-          </span>
-        </Link>
-        <nav className="flex items-center gap-6 text-xs font-mono uppercase tracking-[0.14em]">
-          <Link href="/" className="text-muted hover:text-neon transition-colors">
-            Home
-          </Link>
-          <a
-            href="https://github.com/whatelzai/agentpay"
-            className="text-muted hover:text-neon transition-colors"
-          >
-            GitHub
-          </a>
-        </nav>
-      </header>
+      <SiteHeader active="monitor" />
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 md:px-10 pt-24 md:pt-32 pb-16">
-        <Kicker>Public scorecard · rolling {windowDays}d</Kicker>
+      <section
+        className={`${siteFrameClassName} pb-16 pt-20 md:pb-20 md:pt-28`}
+      >
+        <SectionKicker>Public scorecard · rolling {windowDays}d</SectionKicker>
         <h1 className="mt-6 font-body font-semibold text-4xl md:text-6xl tracking-[-0.03em] leading-[1.05] max-w-3xl">
           Money moves only where the human{" "}
           <span className="text-neon">signed</span>.
@@ -137,7 +93,7 @@ export default async function MonitorPage() {
       </section>
 
       {/* Live KPIs — same rectangles as homepage */}
-      <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 border-t border-rule">
+      <section className={`${siteFrameClassName} border-t border-rule py-16`}>
         <div className="grid grid-cols-2 lg:grid-cols-4 border border-rule mb-10">
           <div className="p-5 border-b border-r border-rule lg:border-b-0">
             <p className="text-[9px] tracking-[0.18em] uppercase text-muted font-mono mb-2">
@@ -183,8 +139,8 @@ export default async function MonitorPage() {
       </section>
 
       {/* Refused mints table */}
-      <section className="max-w-6xl mx-auto px-6 md:px-10 py-24 border-t border-rule">
-        <Kicker>Safety refusals · recent</Kicker>
+      <section className={`${siteFrameClassName} border-t border-rule py-24`}>
+        <SectionKicker>Safety refusals · recent</SectionKicker>
         <h2 className="mt-6 font-body font-semibold text-3xl md:text-4xl tracking-[-0.03em] mb-3">
           What the binding just refused.
         </h2>
@@ -200,8 +156,8 @@ export default async function MonitorPage() {
       </section>
 
       {/* SAFE / UNSAFE definitions */}
-      <section className="max-w-6xl mx-auto px-6 md:px-10 py-24 border-t border-rule">
-        <Kicker>Definitions</Kicker>
+      <section className={`${siteFrameClassName} border-t border-rule py-24`}>
+        <SectionKicker>Definitions</SectionKicker>
         <h2 className="mt-6 font-body font-semibold text-3xl md:text-4xl tracking-[-0.03em] mb-14">
           What we call safe. What we call unsafe.
         </h2>
@@ -242,8 +198,8 @@ export default async function MonitorPage() {
       </section>
 
       {/* Operating rule */}
-      <section className="max-w-6xl mx-auto px-6 md:px-10 py-24 border-t border-rule">
-        <Kicker>Operating rule</Kicker>
+      <section className={`${siteFrameClassName} border-t border-rule py-24`}>
+        <SectionKicker>Operating rule</SectionKicker>
         <p className="mt-6 max-w-3xl text-xl md:text-2xl leading-relaxed text-ink/90">
           Safety gates pass first. Utility comes second. Adoption comes third.
           A verified unsafe request refused by the binding is control evidence.
@@ -252,25 +208,7 @@ export default async function MonitorPage() {
         </p>
       </section>
 
-      {/* Footer */}
-      <footer className="max-w-6xl mx-auto px-6 md:px-10 py-10 border-t border-rule flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="text-[11px] text-muted flex items-start gap-2 font-mono uppercase tracking-[0.14em] leading-relaxed">
-          <Mark className="w-4 h-4 shrink-0" />
-          <p>
-            agentpay · signed at{" "}
-            <a
-              href="https://straitsx.com"
-              className="hover:text-neon transition-colors"
-            >
-              StraitsX AgentiX Playground
-            </a>
-            <span className="block sm:inline"> · SG · 14–16 Aug 2026</span>
-          </p>
-        </div>
-        <p className="text-[10px] tracking-[0.18em] uppercase text-muted font-mono">
-          Track: Agentic Payments Infrastructure
-        </p>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }
