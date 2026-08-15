@@ -1,10 +1,17 @@
-import { putConfirmation, getConfirmation, isRequestId } from "@/src/lib/confirmations";
+import {
+  putConfirmation,
+  getConfirmation,
+  isRequestId,
+} from "@/src/lib/confirmations";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function POST(request: Request, { params }: Params): Promise<Response> {
+export async function POST(
+  request: Request,
+  { params }: Params,
+): Promise<Response> {
   const { id } = await params;
   let token: unknown;
   try {
@@ -23,20 +30,32 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     );
   }
   if (result === "duplicate") {
+    return Response.json({
+      stored: false,
+      confirmation_token: getConfirmation(id),
+    });
+  }
+  if (result === "unavailable") {
     return Response.json(
-      { error: "this request id already holds a confirmation" },
-      { status: 409 },
+      { error: "confirmation sealing is not configured" },
+      { status: 503 },
     );
   }
-  return Response.json({ stored: true });
+  return Response.json({
+    stored: true,
+    confirmation_token: getConfirmation(id),
+  });
 }
 
-export async function GET(_request: Request, { params }: Params): Promise<Response> {
+export async function GET(
+  _request: Request,
+  { params }: Params,
+): Promise<Response> {
   const { id } = await params;
   if (!isRequestId(id)) {
     return Response.json({ error: "invalid request id" }, { status: 400 });
   }
   const token = getConfirmation(id);
   if (!token) return Response.json({ status: "pending" });
-  return Response.json({ status: "confirmed", token });
+  return Response.json({ status: "confirmed", confirmation_token: token });
 }

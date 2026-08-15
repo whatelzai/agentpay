@@ -33,11 +33,11 @@ Use these words, in code and in conversation. One meaning each.
 | Term | Meaning |
 |---|---|
 | **Tuple** | The three values the user approves: (merchant, amount, expiry). Plus a nonce. |
-| **Confirmation** | The EIP-712 typed-data signature over the Tuple. Made by the user's wallet on the `/confirm` page. |
-| **Confirmation Token** | Base64url string that carries the Tuple + signature + signer address. Travels through the agent; tampering breaks the signature. |
+| **Confirmation** | The EIP-712 signature over the request, Tuple, payer, rail, and exact payment-authorization hash. Made by the user's wallet on `/confirm`. |
+| **Confirmation Capability** | AES-GCM-sealed handle that carries the signed purchase through the agent. Only AgentPay can open the linked payment proof. |
 | **Binding** | The rule that a mint request must match the signed Tuple exactly. The core of AgentPay. |
-| **Mint Gate** | The `execute_purchase` tool (formerly `request_card_mint`). Verifies the Binding, then (phase 3c) calls StraitsX. |
-| **Block Receipt** | Signed, logged record of a refused mint: requested vs confirmed, mismatch, REFUSED. (Planned.) |
+| **Mint Gate** | The `execute_purchase` tool. Verifies the Binding and linked payment proof, then calls the configured rail adapter. |
+| **Block Receipt** | Signed, logged record of a refused mint: requested vs confirmed, mismatch, REFUSED. |
 | **Scope** | The limits carried by a minted card: value, expiry, (merchant lock — not yet found in the StraitsX card, see SIG-020). |
 | **The Seam** | The bridge from a self-custody XSGD balance to a funded card: one EIP-3009 signature, facilitator pulls, card is funded. Proven live in SIG-020. |
 | **Rail** | StraitsX card API + XSGD settlement on Avalanche C-Chain mainnet. |
@@ -70,5 +70,5 @@ Use these words, in code and in conversation. One meaning each.
 - Phases 1–3b shipped: landing page, MCP server (HTTP + stdio), CLI, EIP-712 Binding live.
 - **Proven on mainnet:** 1 XSGD → real funded virtual card, on-chain settlement verified
   (SIG-020). The x402 client exists in `scripts/mint-test.ts`.
-- Phase 3c (current): wire the Mint Gate to the real StraitsX mint.
-- Wallet: one funded self-custody wallet (29 XSGD + gas). MetaMask + viem. No Crossmint.
+- Phase 3d (current): wallet-neutral payment adapter, user-funded linked signatures, sealed Confirmation Capabilities, and separate receipt signer are live in code. Durable storage remains open.
+- Wallet default: each user funds their own authorization. Platform-funded mode remains an explicit fixed-owner demo fallback.

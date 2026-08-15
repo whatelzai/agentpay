@@ -1,7 +1,7 @@
 # ARCHITECTURE — How AgentPay works
 
-> One MCP server, one signature, one gate. The agent talks to AgentPay; AgentPay talks to
-> StraitsX; StraitsX settles on Avalanche. The user's signature is the only key to money.
+> One MCP server, linked signatures, one gate. The agent talks to AgentPay; AgentPay talks to
+> a payment rail; the user's exact authorization is the only key to money.
 > Read CONTEXT.md first for the shared language.
 
 ## System overview
@@ -10,20 +10,20 @@
  USER (human)                        AI AGENT (untrusted)
    │                                    │
    │ opens /confirm URL,                │ MCP tools: ping ·
-   │ signs Tuple (EIP-712,              │ propose_purchase ·
-   │ MetaMask)                          │ execute_purchase
+   │ signs payment + Confirmation       │ propose_purchase ·
+   │ (EIP-712, wallet-neutral)          │ execute_purchase
    ▼                                    ▼
  ┌──────────────────────────────────────────────────────┐
  │  AGENTPAY  (this repo — Next.js on Vercel)           │
  │                                                      │
  │  /confirm page ── makes Confirmation Token           │
  │  MCP server (HTTP /api/mcp + stdio) ── tool surface  │
- │  Binding lib ── decode token, recover signer,        │
- │                 check expiry, assert Tuple match     │
+ │  Binding lib ── verify signer, payer, payment hash,  │
+ │                 expiry, replay, and Tuple match      │
  │  Mint Gate ── match → mint · mismatch → REFUSE+diff  │
- │  x402 client ── pays the mint price in XSGD          │
+ │  Payment adapter ── StraitsX now; other rails later  │
  └──────────────┬───────────────────────────────────────┘
-                │ POST issue_card → HTTP 402 → sign EIP-3009
+                │ POST issue_card → HTTP 402 → user signs EIP-3009
                 │ → retry with PAYMENT-SIGNATURE → card
                 ▼
  ┌──────────────────────────────────────────────────────┐
@@ -43,21 +43,21 @@
 
 1. Agent calls `propose_purchase({merchant, amount_sgd, expiry_seconds?})`.
    AgentPay returns a `/confirm?merchant=..&amount=..&expiry=..` URL. No money can move yet.
-2. User opens the URL. The page shows the Tuple. The user connects a wallet and signs
-   EIP-712 typed data: domain `AgentPay v1, chainId 43114`; message
-   `{merchant: string, amountSgd: uint256 (cents), expiryTimestamp: uint256, nonce: bytes32}`.
-3. The page emits a **Confirmation Token** (base64url of message + signature + signer).
-   The user hands it to the agent (paste into chat). The token is not a secret —
-   tampering breaks the signature.
-4. Agent calls `execute_purchase({confirmation_token, merchant, amount_sgd})`.
-   The Mint Gate: decode → recover signer → check expiry → assert merchant and amount
-   match the signed values exactly.
-   - **Mismatch → ⛔ MINT REFUSED** with a field-by-field diff. (Planned: emit a Block Receipt.)
-   - **Match → mint** (phase 3b: stub returns authorization; phase 3c: real mint below).
-5. (Phase 3c) AgentPay pays StraitsX by x402: POST `issue_card` → 402 challenge →
-   sign EIP-3009 `transferWithAuthorization` for the exact amount → retry with
-   `PAYMENT-SIGNATURE` header → card returned, XSGD pulled on-chain by the Facilitator.
-6. Receipt chain: signed Tuple → settlement tx hash → card id. All three link one purchase.
+2. User opens the URL. In the default `user_wallet` mode, AgentPay validates the
+   StraitsX 402 challenge, then the wallet signs the exact EIP-3009 payment authorization.
+3. The wallet signs `AgentPay v2` over `{requestId, merchant, amountSgd,
+   expiryTimestamp, nonce, paymentRail, payer, paymentAuthorizationHash}`. This links
+   the purchase to the exact payment proof and prevents proof replacement.
+4. The page sends the signed payload directly to AgentPay over HTTPS. AgentPay seals it
+   with AES-256-GCM and returns an opaque **Confirmation Capability**. The agent may carry
+   this capability but cannot extract or submit the reusable EIP-3009 payment signature.
+5. Agent calls `execute_purchase({confirmation_token, merchant, amount_sgd})`.
+   The Mint Gate verifies signer = payer, request, rail, payment hash, chain, XSGD asset,
+   exact amount, recipient, expiry, and replay nonce before checking the Tuple.
+   - **Mismatch → MINT REFUSED** with a field diff and Block Receipt.
+   - **Match → submit the already signed payment proof**. No user key is on the server.
+6. StraitsX settles on-chain and returns the card. Receipt chain: signed Tuple and
+   payment proof → settlement transaction → card id.
 
 ## Verified StraitsX facts (live-tested 2026-08-15, see vault SIG-020)
 
@@ -80,27 +80,31 @@ Working reference client: `scripts/mint-test.ts` (minted the real card).
 
 | Data | Agent | User | Notes |
 |---|---|---|---|
-| Tuple, confirmation URL, Token | ✅ | ✅ | Token is tamper-evident, not secret |
+| Tuple, confirmation URL, sealed capability | ✅ | ✅ | Opaque; opens only inside AgentPay |
+| Raw payment proof / EIP-3009 signature | ❌ NEVER | ✅ | Browser posts directly to AgentPay for sealing |
 | Mint result: authorized/refused + diff | ✅ | ✅ | The demo surface |
 | Card PAN / CVV / `card_html` | ❌ NEVER | ✅ via `iframe_url` only | SIG-008 credential-theft rule |
 | `card_opaque_id` | ❌ NEVER | ✅ | settlement_tx is public → opaque_id is the only secret protecting the card |
-| Wallet private key | ❌ NEVER | ✅ | `.env`, gitignored; server-side signing only in phase 3c |
+| User wallet private key | ❌ NEVER | ✅ | Remains in the user's wallet or managed signer |
+| Platform payer key | ❌ NEVER | ❌ | Only exists in explicit `platform_wallet` demo mode |
+| Receipt signer key | ❌ NEVER | ❌ | Separate service identity; production should use KMS/HSM |
 
 ## Known gaps (open items — brainstorm list)
 
-1. **Nonce replay.** `verify.ts` does not store used nonces. One Token can mint many cards
-   until expiry. Need a used-nonce store (in-memory is enough for the demo).
-2. **Signer identity.** Any wallet can sign a Confirmation. The Binding proves "a human
-   signed this Tuple," not "the paying wallet signed it." Phase 3c option: require
-   signer == the wallet that funds the EIP-3009 pull. One key, one custody, closed loop.
-3. **Card scope gap.** The StraitsX card has no merchant lock that we have found, and a
+1. **Durable state.** Confirmations, replay nonces, receipts, and card secrets are still
+   process-local. Production needs atomic durable storage before meaningful funds are enabled.
+2. **Smart-wallet payment compatibility.** AgentPay can optionally verify ERC-1271
+   Confirmations, but the StraitsX EIP-3009 proof currently requires an ECDSA payer.
+   Crossmint smart wallets need a dedicated rail path; MPC EOA wallets can use this path.
+3. **Crossmint access.** The adapter boundary is ready, but Avalanche wallet support is
+   not self-serve in Crossmint's current matrix. Do not add secrets until access is confirmed.
+4. **Card scope gap.** The StraitsX card has no merchant lock that we have found, and a
    3-year expiry. Post-mint, scope enforcement is thinner than the pitch implies.
    Ask DevRel for `issue_card` body fields; if none exist, say it honestly:
    value-scoping is real (card holds only the confirmed amount), merchant-scoping is
    enforced pre-mint by the Binding.
-4. **Charge path.** No demo merchant yet. Options: test charge via a payment processor
+5. **Charge path.** No demo merchant yet. Options: test charge via a payment processor
    sandbox, or narrate the charge. Ask DevRel.
-5. **Block Receipt** not yet emitted on refusal. Cheap, high demo value (SIG-018).
 6. **Detector + Harness** (SIG-019) not started. Strictly additive; cut-safe.
 
 ## Repo map
@@ -109,10 +113,12 @@ Working reference client: `scripts/mint-test.ts` (minted the real card).
 app/                 Next.js App Router
   page.tsx             landing (connect instructions)
   confirm/             the /confirm signing page (ConfirmClient.tsx = wallet + sign)
+  api/payments/prepare validates 402 challenge and prepares user payment proof
   api/mcp/route.ts     MCP over Streamable HTTP
 src/mcp/setup.ts     buildAgentPayServer — tools defined once, both transports
 src/mcp/server.ts    stdio transport entry (npm run mcp)
 src/lib/binding/     schema.ts (EIP-712 types) · verify.ts (decode/recover/verify)
+src/lib/payments/    provider-neutral rail contract · EIP-3009 proof types
 src/lib/mcp/tools/   ping · propose_purchase · execute_purchase (the Mint Gate)
 src/cli/index.ts     commander CLI → npm @aisystemresources/agentpay
 scripts/mint-test.ts proven x402 client (real mainnet mint)
@@ -126,18 +132,14 @@ scripts/mint-test.ts proven x402 client (real mainnet mint)
   version bump on main auto-publishes with provenance.
 - **Chain access:** public RPC `https://api.avax.network/ext/bc/C/rpc` (read + none needed
   for writes — the Facilitator sends the on-chain txs).
-- **Wallet:** one funded self-custody wallet (MetaMask-exported key in `.env`, server-side
-  use only, never committed, never shown to the agent).
-- **Env vars:** see `.env.example`. Secrets: `WALLET_PRIVATE_KEY` (phase 3c),
-  `STRAITSX_MCP_PASSPHRASE` (only if we ever use their SSE transport).
+- **Wallet default:** each user supplies their own ECDSA payment authorization. No payer
+  private key is stored by AgentPay.
+- **Demo fallback:** `platform_wallet` requires a fixed owner and separate payer key.
+- **Env vars:** see `.env.example`. Sandbox and `user_wallet` are the safe defaults.
 
-## Phase 3c plan (current)
+## Payment adapter contract (current)
 
-1. Promote the x402 client from `scripts/mint-test.ts` into `src/lib/straitsx/client.ts`.
-2. Call it from the Mint Gate after the Binding passes. **Direct HTTP — not the SSE MCP.**
-   (Decision basis: proven live, no passphrase dependency, and the 402 dance is our
-   x402-award story. The SSE MCP stays as fallback.)
-3. Redact per the trust-boundary table: the agent gets `{authorized, amount_sgd,
-   settlement_tx, snowtrace_url}` — never `card_html`, never `card_opaque_id`.
-4. Emit the Block Receipt on refusal; log both receipts (mint + block) for the demo feed.
-5. Add the used-nonce store.
+The Mint Gate depends on `PaymentRailAdapter`, not directly on a wallet brand. The live
+adapter is StraitsX with two explicit funding modes. Injected EVM wallets are the first
+authorization UI. Crossmint can be added as a wallet or payment adapter after credentials,
+custody model, and Avalanche support are confirmed. AgentPay policy remains independent.

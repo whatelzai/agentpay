@@ -28,9 +28,16 @@ export async function getConfirmationTool(
       process.env.NEXT_PUBLIC_BASE_URL ?? "https://agentpay-tan.vercel.app";
     try {
       const r = await fetch(`${baseUrl}/api/confirmations/${requestId}`);
-      const body = (await r.json()) as { status?: string; token?: string };
-      if (r.ok && body.status === "confirmed" && typeof body.token === "string") {
-        token = body.token;
+      const body = (await r.json()) as {
+        status?: string;
+        confirmation_token?: string;
+      };
+      if (
+        r.ok &&
+        body.status === "confirmed" &&
+        typeof body.confirmation_token === "string"
+      ) {
+        token = body.confirmation_token;
       }
     } catch {
       // treat as pending; the poll advice below covers transient failures
@@ -42,7 +49,7 @@ export async function getConfirmationTool(
       content: [
         {
           type: "text",
-          text: `Confirmation ${requestId} is still pending — the user has not signed yet. Poll get_confirmation again in a few seconds, or ask the user to paste the token manually if they already signed.`,
+          text: `Confirmation ${requestId} is still pending — the user has not signed yet. Poll get_confirmation again in a few seconds.`,
         },
       ],
     };
