@@ -1,7 +1,18 @@
 {
   "name": "@aisystemresources/agentpay",
   "version": "0.1.0",
-  "private": true,
+  "description": "AgentPay CLI — trust layer for AI-agent payments. Closes the prompt-injection gap the card layer alone cannot.",
+  "bin": {
+    "agentpay": "bin/agentpay.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },
@@ -11,10 +22,14 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "mcp": "tsx src/mcp/server.ts"
+    "mcp": "tsx src/mcp/server.ts",
+    "cli:dev": "tsx src/cli/index.ts",
+    "build:cli": "node scripts/build-cli.mjs",
+    "prepublishOnly": "npm run build:cli"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "commander": "^12.1.0",
     "next": "^16.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
@@ -24,6 +39,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.24.0",
     "eslint": "^9",
     "eslint-config-next": "^16.2.0",
     "postcss": "^8",

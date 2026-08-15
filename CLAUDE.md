@@ -41,8 +41,9 @@ When making architectural or scope decisions, refer to (and update) the vault. D
 ## Phases
 
 - **Phase 1:** ✅ Vercel-deployed landing page. Shipped.
-- **Phase 2 (current):** MCP server at `app/api/mcp/route.ts` (HTTP, `WebStandardStreamableHTTPServerTransport`) + `src/mcp/server.ts` (stdio, `StdioServerTransport`). Shared server builder in `src/mcp/setup.ts`. Tools in `src/lib/mcp/tools/`. Landing page includes connect-to-Claude/Codex instructions. Current tools: `ping`, `confirm_purchase` (stub). Phase 3 adds `request_card_mint` wired to the live StraitsX MCP.
-- **Phase 3:** CLI at `cli/`. commander-based. `agentpay confirm <intent>` as entry point. Cryptographic EIP-712 confirmation signing.
+- **Phase 2:** ✅ MCP server (HTTP + stdio). Shipped.
+- **Phase 3a (current):** CLI scaffold — `src/cli/index.ts` (commander), `bin/agentpay.mjs` (shebang wrapper), `scripts/build-cli.mjs` (esbuild bundle to `dist/cli/index.mjs`). Two commands: `agentpay ping` and `agentpay confirm`. Package config: bin + files + publishConfig ready for `npm publish` as `@aisystemresources/agentpay`.
+- **Phase 3b:** Cryptographic EIP-712 confirmation signing on `/confirm` page (replaces stub). `request_card_mint` MCP tool wired to live StraitsX card MCP at `card.straitsx.ai/production/sse`. CLI gains a `mint` command that verifies the signature and pings the card MCP.
 
 ## MCP endpoints
 
