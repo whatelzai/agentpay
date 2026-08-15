@@ -28,7 +28,7 @@ function newCorrelationId(): string {
   return `att_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-function record(
+async function record(
   correlationId: string,
   outcome: SpendOutcome,
   reasonCode: string,
@@ -39,8 +39,8 @@ function record(
     railStatus?: string;
     evidenceUri?: string;
   } = {},
-): void {
-  recordSpendAttempt({
+): Promise<void> {
+  await recordSpendAttempt({
     correlationId,
     outcome,
     decision: outcome === "authorized" ? "allowed" : "blocked",
@@ -90,7 +90,7 @@ export async function executePurchase(
         reason: `confirmation capability could not be opened: ${(error as Error).message}`,
         requested,
       });
-      record(correlationId, "refused_invalid_sig", "capability_open_failed", requested);
+      await record(correlationId, "refused_invalid_sig", "capability_open_failed", requested);
       return refusal(
         `EXECUTE REFUSED - confirmation capability could not be opened.
 Block Receipt ${receipt.id} logged.`,
@@ -106,7 +106,7 @@ Block Receipt ${receipt.id} logged.`,
       reason: `confirmation_token could not be decoded: ${(e as Error).message}`,
       requested,
     });
-    record(correlationId, "refused_invalid_sig", "token_decode_failed", requested);
+    await record(correlationId, "refused_invalid_sig", "token_decode_failed", requested);
     return refusal(
       `⛔ EXECUTE REFUSED — confirmation_token could not be decoded: ${(e as Error).message}\nBlock Receipt ${receipt.id} logged.`,
     );
@@ -124,7 +124,7 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
-    record(correlationId, "refused_invalid_sig", "unsealed_v2_token", requested);
+    await record(correlationId, "refused_invalid_sig", "unsealed_v2_token", requested);
     return refusal(
       `EXECUTE REFUSED - user-wallet confirmations must be AgentPay-sealed so the agent cannot access the payment signature.
 Block Receipt ${receipt.id} logged.`,
@@ -142,7 +142,7 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
-    record(correlationId, "refused_invalid_sig", "confirmation_sig_invalid", requested);
+    await record(correlationId, "refused_invalid_sig", "confirmation_sig_invalid", requested);
     return refusal(
       `⛔ EXECUTE REFUSED — signature verification failed: ${verification.reason}\nBlock Receipt ${receipt.id} logged.`,
     );
@@ -157,7 +157,7 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
-    record(correlationId, "refused_other", "rail_config_failed", requested, {
+    await record(correlationId, "refused_other", "rail_config_failed", requested, {
       signerAddress: verification.recoveredAddress,
     });
     return refusal(
@@ -172,7 +172,7 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
-      record(correlationId, "refused_other", "v1_wrong_funding_mode", requested, {
+      await record(correlationId, "refused_other", "v1_wrong_funding_mode", requested, {
         signerAddress: verification.recoveredAddress,
       });
       return refusal(
@@ -189,7 +189,7 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
-      record(correlationId, "refused_other", "demo_owner_unconfigured", requested, {
+      await record(correlationId, "refused_other", "demo_owner_unconfigured", requested, {
         signerAddress: verification.recoveredAddress,
       });
       return refusal(
@@ -202,7 +202,7 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
-      record(correlationId, "refused_invalid_sig", "v1_signer_not_owner", requested, {
+      await record(correlationId, "refused_invalid_sig", "v1_signer_not_owner", requested, {
         signerAddress: verification.recoveredAddress,
       });
       return refusal(
@@ -221,7 +221,7 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
-      record(correlationId, "refused_other", "v2_wrong_funding_mode", requested, {
+      await record(correlationId, "refused_other", "v2_wrong_funding_mode", requested, {
         signerAddress: verification.recoveredAddress,
       });
       return refusal(
@@ -237,7 +237,7 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
-      record(correlationId, "refused_invalid_sig", "signer_not_payer", requested, {
+      await record(correlationId, "refused_invalid_sig", "signer_not_payer", requested, {
         signerAddress: verification.recoveredAddress,
       });
       return refusal(
@@ -251,7 +251,7 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
-      record(correlationId, "refused_other", "chain_id_mismatch", requested, {
+      await record(correlationId, "refused_other", "chain_id_mismatch", requested, {
         signerAddress: verification.recoveredAddress,
       });
       return refusal(
@@ -269,7 +269,7 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
-      record(correlationId, "refused_invalid_sig", "payment_proof_invalid", requested, {
+      await record(correlationId, "refused_invalid_sig", "payment_proof_invalid", requested, {
         signerAddress: verification.recoveredAddress,
       });
       return refusal(
@@ -285,7 +285,7 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
-      record(correlationId, "refused_invalid_sig", "payment_hash_swapped", requested, {
+      await record(correlationId, "refused_invalid_sig", "payment_hash_swapped", requested, {
         signerAddress: verification.recoveredAddress,
       });
       return refusal(
@@ -315,7 +315,7 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
-    record(correlationId, "refused_mismatch", "tuple_diverged", requested, {
+    await record(correlationId, "refused_mismatch", "tuple_diverged", requested, {
       signerAddress: verification.recoveredAddress,
     });
     return refusal(
@@ -338,7 +338,7 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
-    record(correlationId, "refused_other", "amount_out_of_card_range", requested, {
+    await record(correlationId, "refused_other", "amount_out_of_card_range", requested, {
       signerAddress: verification.recoveredAddress,
     });
     return refusal(
@@ -353,7 +353,7 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
-    record(correlationId, "refused_replay", "nonce_already_used", requested, {
+    await record(correlationId, "refused_replay", "nonce_already_used", requested, {
       signerAddress: verification.recoveredAddress,
     });
     return refusal(
@@ -373,7 +373,7 @@ Block Receipt ${receipt.id} logged.`,
     if (!mint.paymentAttempted) {
       // Failed before any payment was signed or sent: retry is free.
       releaseNonce(decoded.nonce);
-      record(correlationId, "refused_other", "rail_failed_pre_payment", requested, {
+      await record(correlationId, "refused_other", "rail_failed_pre_payment", requested, {
         signerAddress: verification.recoveredAddress,
         rail: rail.id,
         railStatus: mint.reason,
@@ -385,7 +385,7 @@ Block Receipt ${receipt.id} logged.`,
     // Payment was sent; the facilitator settles on-chain BEFORE returning the
     // card, so the XSGD may be gone even though this response failed. Keep
     // the nonce consumed — an automatic retry could pay twice.
-    record(correlationId, "unauthorized", "rail_failed_post_payment", requested, {
+    await record(correlationId, "unauthorized", "rail_failed_post_payment", requested, {
       signerAddress: verification.recoveredAddress,
       rail: rail.id,
       railStatus: mint.reason,
@@ -422,7 +422,7 @@ Block Receipt ${receipt.id} logged.`,
     iframeUrl: mint.iframeUrl,
   });
 
-  record(correlationId, "authorized", "mint_ok", requested, {
+  await record(correlationId, "authorized", "mint_ok", requested, {
     signerAddress: verification.recoveredAddress,
     rail: rail.id,
     railStatus: "settled",
