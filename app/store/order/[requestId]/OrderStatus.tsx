@@ -60,6 +60,16 @@ function buildConfirmUrl(
   return `/confirm?${params.toString()}`;
 }
 
+// A rail failure whose detail mentions an on-chain revert (or that no payment
+// was sent) is provably a no-settlement: an EVM revert makes no state change,
+// so no XSGD moved. Only when the rail says payment was sent AND we can't see a
+// revert is the outcome genuinely uncertain. Display-only — this never changes
+// what the Mint Gate did, only how the result reads.
+function railFailureMoneySafe(detail?: string): boolean {
+  if (!detail) return false;
+  return /revert|no payment was sent|not consumed/i.test(detail);
+}
+
 function TupleCard({
   eyebrow,
   merchant,
@@ -362,13 +372,29 @@ export function OrderStatus({
             Correct intent. The rail did not settle.
           </p>
           <p className="mt-2 text-sm text-[#432b21]/75">
-            AgentPay verified an exact Tuple match. The sandbox rail made the
-            final funding or issuance decision, so this is not reported as a
-            prompt-injection block.
+            AgentPay verified an exact Tuple match — this is not a
+            prompt-injection block. The rail made the final funding decision and
+            declined: the wallet&apos;s authorized funds were not enough to
+            settle.
           </p>
-          <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-lg bg-white/60 p-4 text-xs text-[#6b4615]">
-            {data.detail}
-          </pre>
+          {railFailureMoneySafe(data.detail) ? (
+            <p className="mt-3 text-sm font-semibold text-[#3e6b2a]">
+              No money moved — the settlement transfer reverted on-chain.
+            </p>
+          ) : (
+            <p className="mt-3 text-sm font-semibold text-[#8a5a1a]">
+              Settlement is unconfirmed — verify the wallet on-chain before any
+              retry.
+            </p>
+          )}
+          <details className="mt-4 text-xs text-[#6b4615]">
+            <summary className="cursor-pointer font-semibold">
+              Rail response (technical)
+            </summary>
+            <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-white/60 p-4">
+              {data.detail}
+            </pre>
+          </details>
         </div>
       ) : null}
 
