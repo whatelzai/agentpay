@@ -47,6 +47,15 @@ export default function StorePage() {
             </Link>
           ))}
         </div>
+
+        <div className="mt-12 pt-8 border-t border-[#e0d5c3]">
+          <Link
+            href="/store/demo/a2a"
+            className="text-sm font-medium text-[#c96a3e] hover:underline"
+          >
+            See the A2A injection demo (scripted transcript) →
+          </Link>
+        </div>
       </div>
     </main>
   );
