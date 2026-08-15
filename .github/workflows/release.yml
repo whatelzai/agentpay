@@ -1,0 +1,75 @@
+# NOTE: workflow filename is pinned in npm Trusted Publisher config for
+# @aisystemresources/agentpay. Renaming this file breaks publishing until
+# the npm side is reconfigured.
+#
+# Adapted from EMDEE's SPR-199: collapse tag + npm publish into a single
+# OIDC-backed workflow. Triggered on push to main. If package.json .version
+# changed vs HEAD~1, tag the commit as v$VERSION, then publish to npm via
+# Trusted Publisher (OIDC — no NPM_TOKEN) with provenance signing.
+
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect version bump
+        id: bump
+        run: |
+          CURR=$(jq -r .version package.json)
+          PREV=$(git show HEAD~1:package.json | jq -r .version)
+          echo "current=$CURR" >> "$GITHUB_OUTPUT"
+          echo "previous=$PREV" >> "$GITHUB_OUTPUT"
+          if [ "$CURR" = "$PREV" ]; then
+            echo "Version unchanged ($CURR); skipping release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version bumped: $PREV -> $CURR"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "version=$CURR" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.bump.outputs.skip == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: 'https://registry.npmjs.org'
+
+      # setup-node@v4 ships npm 10.8.2 which supports provenance via OIDC
+      # but still requires NPM_TOKEN for the actual publish PUT. Trusted
+      # Publisher OIDC auth for the publish itself landed in npm 11.5.1+.
+      # Pin to ^11.5.1 — npm@latest is 12.x which requires Node >= 22.
+      - if: steps.bump.outputs.skip == 'false'
+        run: npm install -g npm@^11.5.1
+
+      - if: steps.bump.outputs.skip == 'false'
+        run: npm ci
+
+      - if: steps.bump.outputs.skip == 'false'
+        run: npm run build:cli
+
+      - name: Publish to npm (OIDC + provenance)
+        if: steps.bump.outputs.skip == 'false'
+        run: npm publish --access public --provenance
+
+      # Tag AFTER publish so a failed publish doesn't leave a stranded
+      # tag on origin that blocks retry. If publish succeeds, the tag is
+      # the record of what's on the registry.
+      - name: Tag release
+        if: steps.bump.outputs.skip == 'false'
+        run: |
+          git tag "v${{ steps.bump.outputs.version }}"
+          git push origin "v${{ steps.bump.outputs.version }}"

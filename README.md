@@ -33,6 +33,10 @@ Open http://localhost:3000.
 - `npm run cli:dev` — run CLI from source via tsx (fast iteration)
 - `npm run build:cli` — bundle CLI to `dist/cli/index.mjs` via esbuild
 
+## Release
+
+CLI publishes to npm automatically when `package.json .version` bumps on `main`. Workflow: `.github/workflows/release.yml` — uses npm Trusted Publisher (OIDC), tags `v$VERSION` after publish. See CLAUDE.md for one-time npm setup.
+
 ## CLI
 
 ```bash
