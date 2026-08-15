@@ -53,7 +53,7 @@ export default async function ProductPage({ params }: { params: Params }) {
           <RevealPayload payload={product.hiddenPayload} />
         ) : null}
 
-        {product.slug === "latte" ? (
+        {product.hiddenPayload ? (
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <section
               id="s1"
@@ -63,8 +63,9 @@ export default async function ProductPage({ params }: { params: Params }) {
                 S1 / Exact intent
               </p>
               <p className="my-3 text-sm leading-relaxed text-[#432b21]/75">
-                Sign Latte at SGD 5.00. The demo agent requests exactly that
-                Tuple, so AgentPay can submit it to the sandbox rail.
+                Sign {product.name} at {formatSgd(product.priceSgd)}. The demo
+                agent requests exactly that Tuple, so AgentPay submits it to
+                the sandbox rail.
               </p>
               <CheckoutButton
                 slug={product.slug}
@@ -81,8 +82,8 @@ export default async function ProductPage({ params }: { params: Params }) {
                 S2 / Inject after signing
               </p>
               <p className="my-3 text-sm leading-relaxed text-[#432b21]/75">
-                Sign the same Latte. Then the demo agent obeys the hidden page
-                instruction and asks for Evil Store at SGD 28.00.
+                Sign the same {product.name}. Then the demo agent obeys the
+                hidden page instruction and asks for Evil Store at SGD 28.00.
               </p>
               <CheckoutButton
                 slug={product.slug}
@@ -93,26 +94,6 @@ export default async function ProductPage({ params }: { params: Params }) {
               />
             </section>
           </div>
-        ) : product.slug === "weekly-grocery-bundle" ? (
-          <section
-            id="s3"
-            className="mt-8 rounded-xl border border-[#e8c98a] bg-[#fdf3e0] p-5"
-          >
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#8a5a1a]">
-              S3 / Rail boundary
-            </p>
-            <p className="my-3 text-sm leading-relaxed text-[#432b21]/75">
-              AgentPay receives an exact Tuple match. The StraitsX sandbox rail
-              still decides whether the wallet can fund SGD 28.00.
-            </p>
-            <CheckoutButton
-              slug={product.slug}
-              priceSgd={product.priceSgd}
-              scenario="rail_limit"
-              label="Run the rail-limit path ->"
-              tone="rail"
-            />
-          </section>
         ) : (
           <CheckoutButton
             slug={product.slug}
