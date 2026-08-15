@@ -63,8 +63,9 @@ Auto-publishes via `.github/workflows/release.yml` when any commit on main bumps
 - **Phase 1:** ✅ Vercel-deployed landing page. Shipped.
 - **Phase 2:** ✅ MCP server (HTTP + stdio). Shipped.
 - **Phase 3a:** ✅ CLI scaffold — `src/cli/index.ts` (commander), `bin/agentpay.mjs` (shebang wrapper), `scripts/build-cli.mjs` (esbuild bundle). Commands: `agentpay ping`, `agentpay confirm`, `agentpay mint`.
-- **Phase 3b (current):** EIP-712 cryptographic signing on `/confirm` page. `src/lib/binding/{schema,verify}.ts` defines the typed data + verify utility (viem). `app/confirm/ConfirmClient.tsx` handles wallet connect + sign + token display. New `request_card_mint` MCP tool decodes the token, recovers the signer, verifies expiry, and refuses on (merchant, amount) mismatch with a visible diff. Actual StraitsX mint is stubbed — returns authorization result only.
-- **Phase 3c:** Wire the mint stub to the live StraitsX card MCP at `card.straitsx.ai/production/sse`. Requires mcp-inspector session on the sandbox endpoint to capture the actual tool schema (per RES-001 v2 to-do).
+- **Phase 3b:** EIP-712 cryptographic signing on `/confirm` plus exact Tuple Binding.
+- **Phase 3c:** Real StraitsX x402 card mint, nonce replay guard, credential redaction, Block Receipts, and confirmation hand-off.
+- **Phase 3d (current):** Wallet-neutral payment adapter. Default `user_wallet` mode links the user's EIP-3009 payment proof to an AgentPay v2 Confirmation, then seals the proof before it crosses the agent boundary. `platform_wallet` is an explicit fixed-owner demo fallback. Receipt signing is separate from payment signing.
 
 ## MCP endpoints
 

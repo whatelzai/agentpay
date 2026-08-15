@@ -1,11 +1,11 @@
 // Receipt store: every Mint Gate outcome leaves a logged record.
 // - MINTED: the proof chain (Tuple → settlement_tx → snowtrace link).
 // - REFUSED: the Block Receipt — requested vs confirmed, reason, signed by
-//   the server wallet (EIP-712) so a refusal is itself a verifiable artifact.
+//   an independent receipt signer so a refusal is a verifiable artifact.
 // In-memory per decision; console output doubles as the demo feed.
 
 import { randomBytes } from "node:crypto";
-import { serverWalletAccount } from "./straitsx/client";
+import { receiptSignerAccount } from "./signing/receipt";
 
 export type ReceiptTuple = {
   merchant: string;
@@ -32,8 +32,8 @@ export type BlockReceipt = {
   requested: { merchant: string; amountSgdCents: string };
   confirmed: { merchant: string; amountSgdCents: string };
   timestamp: string;
-  // EIP-712 signature by the server wallet over the refusal facts.
-  // degraded=true when no server key is configured (verification-only deploys).
+  // EIP-712 signature by the receipt signer over the refusal facts.
+  // degraded=true when no receipt signer is configured.
   signature?: `0x${string}`;
   signedBy?: string;
   degraded?: boolean;
@@ -104,7 +104,7 @@ export async function recordBlockReceipt(input: {
     timestamp: timestamp.toISOString(),
   };
 
-  const account = serverWalletAccount();
+  const account = receiptSignerAccount();
   if (account) {
     receipt.signature = await account.signTypedData({
       domain: BLOCK_RECEIPT_DOMAIN,

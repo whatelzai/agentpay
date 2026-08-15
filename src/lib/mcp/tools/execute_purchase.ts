@@ -2,13 +2,22 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolContext } from "./types";
 import { decodeToken, verifyConfirmation } from "../../binding/verify";
 import { claimNonce, releaseNonce } from "../../binding/nonces";
-import { mintCard, straitsxEnv } from "../../straitsx/client";
+import { configuredPaymentRail } from "../../payments/adapter";
+import {
+  STRAITSX_CHAIN_ID,
+  straitsxEnv,
+  verifyPaymentProof,
+} from "../../straitsx/client";
 import { recordBlockReceipt, recordMintReceipt } from "../../receipts";
 import { storeCardSecret } from "../../card_vault";
-
-// StraitsX card range (SIG-021). The raw API is looser; we stay inside it.
-const MIN_AMOUNT_CENTS = 500n;
-const MAX_AMOUNT_CENTS = 3000n;
+import {
+  isSupportedCardAmount,
+  sgdToCents,
+} from "../../payments/amount";
+import {
+  isSealedConfirmationToken,
+  openConfirmationToken,
+} from "../../signing/confirmation_seal";
 
 function refusal(text: string): CallToolResult {
   return { content: [{ type: "text", text }], isError: true };
@@ -31,14 +40,37 @@ export async function executePurchase(
       "Error: confirmation_token (string), merchant (string), and amount_sgd (number) are all required.",
     );
   }
+  const requestedAmountCents = sgdToCents(amountSgd);
+  if (requestedAmountCents === null) {
+    return refusal(
+      "Error: amount_sgd must be positive and use whole cents; AgentPay never rounds an execution request.",
+    );
+  }
   const requested = {
     merchant,
-    amountSgdCents: BigInt(Math.round(amountSgd * 100)),
+    amountSgdCents: requestedAmountCents,
   };
+
+  let serializedToken = confirmationToken;
+  const isSealed = isSealedConfirmationToken(confirmationToken);
+  if (isSealed) {
+    try {
+      serializedToken = openConfirmationToken(confirmationToken);
+    } catch (error) {
+      const receipt = await recordBlockReceipt({
+        reason: `confirmation capability could not be opened: ${(error as Error).message}`,
+        requested,
+      });
+      return refusal(
+        `EXECUTE REFUSED - confirmation capability could not be opened.
+Block Receipt ${receipt.id} logged.`,
+      );
+    }
+  }
 
   let decoded;
   try {
-    decoded = decodeToken(confirmationToken);
+    decoded = decodeToken(serializedToken);
   } catch (e) {
     const receipt = await recordBlockReceipt({
       reason: `confirmation_token could not be decoded: ${(e as Error).message}`,
@@ -46,6 +78,21 @@ export async function executePurchase(
     });
     return refusal(
       `⛔ EXECUTE REFUSED — confirmation_token could not be decoded: ${(e as Error).message}\nBlock Receipt ${receipt.id} logged.`,
+    );
+  }
+  if (decoded.version === 2 && !isSealed) {
+    const confirmed = {
+      merchant: decoded.merchant,
+      amountSgdCents: decoded.amountSgd,
+    };
+    const receipt = await recordBlockReceipt({
+      reason: "unsealed user-wallet confirmation exposed a payment signature",
+      requested,
+      confirmed,
+    });
+    return refusal(
+      `EXECUTE REFUSED - user-wallet confirmations must be AgentPay-sealed so the agent cannot access the payment signature.
+Block Receipt ${receipt.id} logged.`,
     );
   }
   const confirmed = {
@@ -65,36 +112,123 @@ export async function executePurchase(
     );
   }
 
-  // Owner check: only the registered owner's signature can move money.
-  // Fail closed — a mint gate with no configured owner refuses everything.
-  const owner = process.env.OWNER_ADDRESS;
-  if (!owner) {
+  let rail;
+  try {
+    rail = configuredPaymentRail();
+  } catch (error) {
     const receipt = await recordBlockReceipt({
-      reason: "OWNER_ADDRESS is not configured; the Mint Gate fails closed",
+      reason: `payment rail configuration failed: ${(error as Error).message}`,
       requested,
       confirmed,
     });
     return refusal(
-      `⛔ EXECUTE REFUSED — this deployment has no registered owner (OWNER_ADDRESS unset). The Mint Gate fails closed.\nBlock Receipt ${receipt.id} logged.`,
+      `EXECUTE REFUSED - payment rail configuration failed closed.\nBlock Receipt ${receipt.id} logged.`,
     );
   }
-  if (verification.recoveredAddress.toLowerCase() !== owner.toLowerCase()) {
-    const receipt = await recordBlockReceipt({
-      reason: `signer ${verification.recoveredAddress} is not the registered owner`,
-      requested,
-      confirmed,
+
+  if (decoded.version === 1) {
+    if (rail.fundingMode !== "platform_wallet") {
+      const receipt = await recordBlockReceipt({
+        reason: "legacy confirmation cannot use user_wallet funding",
+        requested,
+        confirmed,
+      });
+      return refusal(
+        `EXECUTE REFUSED - this legacy confirmation has no user payment authorization.\nBlock Receipt ${receipt.id} logged.`,
+      );
+    }
+
+    // Shared treasury mode is deliberately single-owner. Allowing any dynamic
+    // signer here would let an attacker authorize spending from platform funds.
+    const owner = process.env.DEMO_OWNER_ADDRESS ?? process.env.OWNER_ADDRESS;
+    if (!owner) {
+      const receipt = await recordBlockReceipt({
+        reason: "DEMO_OWNER_ADDRESS is not configured; the Mint Gate fails closed",
+        requested,
+        confirmed,
+      });
+      return refusal(
+        `EXECUTE REFUSED - platform_wallet mode has no registered demo owner.\nBlock Receipt ${receipt.id} logged.`,
+      );
+    }
+    if (verification.recoveredAddress.toLowerCase() !== owner.toLowerCase()) {
+      const receipt = await recordBlockReceipt({
+        reason: `signer ${verification.recoveredAddress} is not the registered demo owner`,
+        requested,
+        confirmed,
+      });
+      return refusal(
+        [
+          "EXECUTE REFUSED - the confirmation is not from the platform wallet owner.",
+          `  signer: ${verification.recoveredAddress}`,
+          `  owner:  ${owner}`,
+          `Block Receipt ${receipt.id} logged.`,
+        ].join("\n"),
+      );
+    }
+  } else {
+    if (rail.fundingMode !== "user_wallet") {
+      const receipt = await recordBlockReceipt({
+        reason: "user-funded confirmation cannot use platform_wallet funding",
+        requested,
+        confirmed,
+      });
+      return refusal(
+        `EXECUTE REFUSED - the signed funding model does not match this deployment.\nBlock Receipt ${receipt.id} logged.`,
+      );
+    }
+    if (
+      verification.recoveredAddress.toLowerCase() !==
+      decoded.payer.toLowerCase()
+    ) {
+      const receipt = await recordBlockReceipt({
+        reason: "confirmation signer is not the payment wallet",
+        requested,
+        confirmed,
+      });
+      return refusal(
+        `EXECUTE REFUSED - the confirming wallet is not the wallet funding the payment.\nBlock Receipt ${receipt.id} logged.`,
+      );
+    }
+    const environment = straitsxEnv();
+    if (decoded.chainId !== STRAITSX_CHAIN_ID[environment]) {
+      const receipt = await recordBlockReceipt({
+        reason: "confirmation chain does not match the configured rail",
+        requested,
+        confirmed,
+      });
+      return refusal(
+        `EXECUTE REFUSED - confirmation chain does not match the configured rail.\nBlock Receipt ${receipt.id} logged.`,
+      );
+    }
+    const paymentVerification = await verifyPaymentProof(decoded.paymentProof, {
+      amountCents: decoded.amountSgd,
+      environment,
+      payerAddress: decoded.payer,
     });
-    return refusal(
-      [
-        "⛔ EXECUTE REFUSED — the confirmation is validly signed, but not by the registered owner.",
-        "",
-        `  signer:  ${verification.recoveredAddress}`,
-        `  owner:   ${owner}`,
-        "",
-        "Only the owner's wallet can authorize a mint. A stolen or third-party confirmation moves nothing.",
-        `Block Receipt ${receipt.id} logged.`,
-      ].join("\n"),
-    );
+    if (!("valid" in paymentVerification)) {
+      const receipt = await recordBlockReceipt({
+        reason: `payment authorization failed: ${paymentVerification.reason}`,
+        requested,
+        confirmed,
+      });
+      return refusal(
+        `EXECUTE REFUSED - payment authorization failed: ${paymentVerification.reason}\nBlock Receipt ${receipt.id} logged.`,
+      );
+    }
+    if (
+      paymentVerification.authorizationHash.toLowerCase() !==
+      decoded.paymentAuthorizationHash.toLowerCase()
+    ) {
+      const receipt = await recordBlockReceipt({
+        reason: "payment authorization does not match the signed Confirmation",
+        requested,
+        confirmed,
+      });
+      return refusal(
+        `EXECUTE REFUSED - the payment authorization was replaced after confirmation.\nBlock Receipt ${receipt.id} logged.`,
+      );
+    }
   }
 
   // THE critical check: does the agent's request match what the user signed?
@@ -132,10 +266,7 @@ export async function executePurchase(
     );
   }
 
-  if (
-    decoded.amountSgd < MIN_AMOUNT_CENTS ||
-    decoded.amountSgd > MAX_AMOUNT_CENTS
-  ) {
+  if (!isSupportedCardAmount(decoded.amountSgd)) {
     const receipt = await recordBlockReceipt({
       reason: `amount SGD ${(Number(decoded.amountSgd) / 100).toFixed(2)} is outside the 5–30 SGD card range`,
       requested,
@@ -158,19 +289,33 @@ export async function executePurchase(
     );
   }
 
-  const env = straitsxEnv();
-  const mint = await mintCard({
+  const mint = await rail.execute({
     amountCents: decoded.amountSgd,
     cardholderName: "AgentPay Demo",
-    env,
+    payerAddress: decoded.version === 2 ? decoded.payer : undefined,
+    proof: decoded.version === 2 ? decoded.paymentProof : undefined,
   });
 
   if (!mint.ok) {
-    // Rail failure, not a Binding refusal: the confirmation is not consumed.
-    releaseNonce(decoded.nonce);
     console.error(`[agentpay] mint failed at the rail: ${mint.reason}`);
+    if (!mint.paymentAttempted) {
+      // Failed before any payment was signed or sent: retry is free.
+      releaseNonce(decoded.nonce);
+      return refusal(
+        `Error: the mint failed at the rail — ${mint.reason}\nNo payment was sent. Your confirmation was NOT consumed; it is safe to retry until it expires.`,
+      );
+    }
+    // Payment was sent; the facilitator settles on-chain BEFORE returning the
+    // card, so the XSGD may be gone even though this response failed. Keep
+    // the nonce consumed — an automatic retry could pay twice.
     return refusal(
-      `Error: the mint failed at the rail — ${mint.reason}\nYour confirmation was NOT consumed; it is safe to retry until it expires.`,
+      [
+        `Error: the rail failed AFTER payment was sent — ${mint.reason}`,
+        "",
+        "The payment may have settled on-chain even though no card was returned.",
+        "Do NOT retry with this confirmation — it is consumed to prevent a double spend.",
+        "A human must verify the wallet's on-chain balance and contact StraitsX with the settlement transaction before any new attempt.",
+      ].join("\n"),
     );
   }
 
@@ -205,6 +350,11 @@ export async function executePurchase(
           JSON.stringify(
             {
               authorized: true,
+              request_id:
+                decoded.version === 2 ? decoded.requestId : undefined,
+              payment_rail: rail.id,
+              funding_mode: rail.fundingMode,
+              payer: decoded.version === 2 ? decoded.payer : undefined,
               amount_sgd: mint.amountSgd,
               settlement_tx: mint.settlementTx,
               snowtrace_url: mint.snowtraceUrl,

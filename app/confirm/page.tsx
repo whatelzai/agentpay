@@ -1,4 +1,6 @@
 import { ConfirmClient } from "./ConfirmClient";
+import { configuredFundingMode } from "@/src/lib/payments/adapter";
+import { STRAITSX_CHAIN_ID, straitsxEnv } from "@/src/lib/straitsx/client";
 
 type SearchParams = Promise<{
   merchant?: string;
@@ -13,6 +15,10 @@ export default async function Confirm({
   searchParams: SearchParams;
 }) {
   const { merchant, amount, expiry, rid } = await searchParams;
+  const fundingMode = configuredFundingMode();
+  const chainId = STRAITSX_CHAIN_ID[straitsxEnv()] as 43113 | 43114;
+  const hasRequiredParams =
+    Boolean(merchant && amount && rid);
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -45,28 +51,27 @@ export default async function Confirm({
           </div>
         </div>
 
-        {merchant && amount ? (
+        {hasRequiredParams && merchant && amount ? (
           <ConfirmClient
             merchant={merchant}
             amount={amount}
             expirySeconds={expiry ?? "300"}
             requestId={rid}
+            fundingMode={fundingMode}
+            chainId={chainId}
           />
         ) : (
           <p className="text-sm text-red-400">
-            Missing required URL params:{" "}
-            <code className="text-xs">merchant</code> and{" "}
-            <code className="text-xs">amount</code>. Ask your agent to call{" "}
+            This is not a complete confirmation URL. Ask your agent to call{" "}
             <code className="text-xs">propose_purchase</code> first.
           </p>
         )}
 
         <p className="text-xs text-neutral-600 mt-8">
-          Your signature is a cryptographic commitment to (merchant, amount,
-          expiry, nonce) via EIP-712 typed data. The card mint layer verifies
-          this signature against the agent&apos;s mint request. Divergence
-          refuses the mint. Prompt injection between signature and mint cannot
-          hijack the purchase.
+          Your AgentPay signature commits to the request, merchant, amount,
+          expiry, payer, rail, and exact payment authorization. The Mint Gate
+          verifies every field against the agent&apos;s request. Divergence refuses
+          the mint.
         </p>
       </div>
     </main>

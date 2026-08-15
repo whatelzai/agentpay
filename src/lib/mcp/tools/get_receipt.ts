@@ -30,7 +30,7 @@ function renderReceipt(r: Receipt): string {
           `  signature: ${r.signature}`,
           `  signed by: ${r.signedBy} (EIP-712 BlockReceipt, verifiable)`,
         ]
-      : ["  signature: none — server wallet not configured (degraded record)"]),
+      : ["  signature: none — receipt signer not configured (degraded record)"]),
     "",
     "This Block Receipt is the audit trail of a refused mint. Money did not move.",
   ].join("\n");

@@ -1,41 +1,45 @@
-// StraitsX card-mint client over x402 (exact scheme, EIP-3009).
-// Promoted from scripts/mint-test.ts — the client that minted the real
-// production card (vault SIG-020). Direct HTTP is StraitsX's designed flow
-// (SIG-021): POST issue_card → 402 challenge → sign TransferWithAuthorization
-// → retry with base64 PAYMENT-SIGNATURE (transports-v2 accepted-echo shape).
-//
-// Trust rules enforced here, at the rail edge:
-// - The challenge must demand EXACTLY the user-confirmed amount, on the
-//   expected chain, in the expected XSGD contract — otherwise we refuse to
-//   sign. A tampered or spoofed challenge cannot move more than the Tuple.
-// - The raw mint response carries full card credentials (card_html with
-//   PAN/CVV, card_opaque_id). This module never logs it and returns only a
-//   whitelisted subset. Callers decide what the agent may see.
-
 import { randomBytes } from "node:crypto";
+import { getAddress, isAddress, recoverTypedDataAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import {
+  paymentAuthorizationHash,
+  transferAuthorizationTypedData,
+  type StraitsXPaymentIntent,
+  type StraitsXPaymentProof,
+  type X402Accepted,
+} from "../payments/eip3009";
 
 export type StraitsXEnv = "sandbox" | "production";
 
 export const STRAITSX_CHAIN_ID: Record<StraitsXEnv, number> = {
-  sandbox: 43113, // Avalanche Fuji
-  production: 43114, // Avalanche C-Chain mainnet
+  sandbox: 43113,
+  production: 43114,
 };
 
-// EIP-55 checksummed (viem rejects the mixed-case variants some docs carry).
 export const XSGD_ASSET: Record<StraitsXEnv, `0x${string}`> = {
   sandbox: "0xd769410dc8772695A7f55a304d2125320A65c2a5",
   production: "0xb2F85b7AB3c2b6f62DF06dE6aE7D09c010a5096E",
 };
 
-// XSGD has 6 decimals; the Tuple stores SGD cents (2 decimals).
 const XSGD_UNITS_PER_CENT = 10_000n;
+const MAX_PAYMENT_LIFETIME_SECONDS = 300;
+const CLOCK_SKEW_SECONDS = 30;
 
 export type MintRequest = {
-  // From the VERIFIED Tuple — never from agent-supplied arguments.
   amountCents: bigint;
   cardholderName: string;
   env: StraitsXEnv;
+};
+
+export type PrepareMintRequest = {
+  amountCents: bigint;
+  cardholderName: string;
+  environment: StraitsXEnv;
+  payerAddress: `0x${string}`;
+};
+
+export type UserFundedMintRequest = PrepareMintRequest & {
+  proof: StraitsXPaymentProof;
 };
 
 export type MintSuccess = {
@@ -43,17 +47,31 @@ export type MintSuccess = {
   amountSgd: string;
   settlementTx: string;
   snowtraceUrl: string;
-  // Credential material — for the server-side card vault only.
-  // MUST NOT reach any agent-visible surface.
   cardOpaqueId: string;
   iframeUrl?: string;
 };
 
-export type MintFailure = { ok: false; reason: string };
+export type MintFailure = {
+  ok: false;
+  reason: string;
+  paymentAttempted: boolean;
+};
 export type MintResult = MintSuccess | MintFailure;
+export type PrepareMintResult =
+  | {
+      ok: true;
+      intent: StraitsXPaymentIntent;
+      authorizationHash: `0x${string}`;
+    }
+  | MintFailure;
+
+type X402Challenge = {
+  x402Version?: number;
+  accepts?: unknown[];
+};
 
 export function straitsxEnv(): StraitsXEnv {
-  return process.env.STRAITSX_ENV === "sandbox" ? "sandbox" : "production";
+  return process.env.STRAITSX_ENV === "production" ? "production" : "sandbox";
 }
 
 export function snowtraceTxUrl(env: StraitsXEnv, tx: string): string {
@@ -62,153 +80,367 @@ export function snowtraceTxUrl(env: StraitsXEnv, tx: string): string {
     : `https://testnet.snowtrace.io/tx/${tx}`;
 }
 
-function loadServerKey(): `0x${string}` | null {
-  const key = process.env.WALLET_PRIVATE_KEY;
+function loadPlatformPayerKey(): `0x${string}` | null {
+  const key =
+    process.env.STRAITSX_PAYER_PRIVATE_KEY ?? process.env.WALLET_PRIVATE_KEY;
   if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) return null;
   return key as `0x${string}`;
 }
 
-export function serverWalletAccount() {
-  const key = loadServerKey();
+export function platformPayerAccount() {
+  const key = loadPlatformPayerKey();
   return key ? privateKeyToAccount(key) : null;
 }
 
-export async function mintCard(req: MintRequest): Promise<MintResult> {
-  const account = serverWalletAccount();
-  if (!account) {
-    return { ok: false, reason: "server wallet key is not configured" };
-  }
+function issueCardUrl(environment: StraitsXEnv): string {
+  return `https://card.straitsx.ai/${environment}/cardapi/issue_card`;
+}
 
-  const url = `https://card.straitsx.ai/${req.env}/cardapi/issue_card`;
-  // The body drives the challenge price AND the card value (SIG-021).
-  // Sent on both the challenge request and the paid retry.
-  const body = JSON.stringify({
-    amount_sgd: Number(req.amountCents) / 100,
-    cardholder_name: req.cardholderName,
-    wallet_address: account.address,
+function issueCardBody(input: PrepareMintRequest): string {
+  return JSON.stringify({
+    amount_sgd: Number(input.amountCents) / 100,
+    cardholder_name: input.cardholderName,
+    wallet_address: input.payerAddress,
   });
+}
 
-  // Step 1 — fetch the x402 challenge.
-  let challenge: {
-    x402Version?: number;
-    accepts?: Array<{
-      chainId?: number;
-      asset?: string;
-      amount?: string;
-      payTo?: string;
-      maxTimeoutSeconds?: number;
-      extra?: { name?: string; version?: string };
-    }>;
-  };
-  let status: number;
-  try {
-    const r1 = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    status = r1.status;
-    challenge = await r1.json();
-  } catch (e) {
-    return { ok: false, reason: `challenge request failed: ${(e as Error).message}` };
+function parseAccepted(value: unknown): X402Accepted | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const accepted = value as Record<string, unknown>;
+  if (
+    typeof accepted.chainId !== "number" ||
+    !Number.isInteger(accepted.chainId) ||
+    typeof accepted.asset !== "string" ||
+    typeof accepted.amount !== "string" ||
+    typeof accepted.payTo !== "string" ||
+    !isAddress(accepted.asset, { strict: false }) ||
+    !isAddress(accepted.payTo, { strict: false })
+  ) {
+    return null;
   }
-  const acc = challenge.accepts?.[0];
-  if (status !== 402 || !acc) {
-    return { ok: false, reason: `expected an HTTP 402 challenge, got HTTP ${status}` };
+  if (
+    accepted.maxTimeoutSeconds !== undefined &&
+    (typeof accepted.maxTimeoutSeconds !== "number" ||
+      !Number.isInteger(accepted.maxTimeoutSeconds) ||
+      accepted.maxTimeoutSeconds <= 0)
+  ) {
+    return null;
+  }
+  if (accepted.scheme !== undefined && typeof accepted.scheme !== "string") {
+    return null;
+  }
+  if (accepted.extra !== undefined) {
+    if (
+      !accepted.extra ||
+      typeof accepted.extra !== "object" ||
+      Array.isArray(accepted.extra)
+    ) {
+      return null;
+    }
+    const extra = accepted.extra as Record<string, unknown>;
+    if (
+      (extra.name !== undefined && typeof extra.name !== "string") ||
+      (extra.version !== undefined && typeof extra.version !== "string")
+    ) {
+      return null;
+    }
+  }
+  return accepted as X402Accepted;
+}
+
+function expectedXsgdUnits(amountCents: bigint): bigint {
+  return amountCents * XSGD_UNITS_PER_CENT;
+}
+
+export function validatePaymentIntent(
+  intent: StraitsXPaymentIntent,
+  expected: {
+    amountCents: bigint;
+    environment: StraitsXEnv;
+    payerAddress: `0x${string}`;
+    requireLiveAuthorization?: boolean;
+  },
+): string | null {
+  if (!intent || typeof intent !== "object" || Array.isArray(intent)) {
+    return "payment proof has a malformed intent";
+  }
+  const rawIntent = intent as unknown as Record<string, unknown>;
+  if (rawIntent.rail !== "straitsx") {
+    return "payment proof is not for the StraitsX rail";
+  }
+  if (rawIntent.environment !== expected.environment) {
+    return `payment environment ${String(rawIntent.environment)} does not match ${expected.environment}`;
+  }
+  if (rawIntent.x402Version !== 1) {
+    return `unsupported x402 version ${String(rawIntent.x402Version)}`;
+  }
+  const rawAuthorization = rawIntent.authorization;
+  if (
+    !rawAuthorization ||
+    typeof rawAuthorization !== "object" ||
+    Array.isArray(rawAuthorization)
+  ) {
+    return "payment proof has a malformed authorization";
+  }
+  const authorization = rawAuthorization as Record<string, unknown>;
+  if (
+    typeof authorization.from !== "string" ||
+    typeof authorization.to !== "string" ||
+    typeof authorization.value !== "string" ||
+    typeof authorization.validAfter !== "string" ||
+    typeof authorization.validBefore !== "string" ||
+    typeof authorization.nonce !== "string" ||
+    !isAddress(authorization.from, { strict: false }) ||
+    !isAddress(authorization.to, { strict: false })
+  ) {
+    return "payment proof has malformed authorization fields";
   }
 
-  // Step 2 — refuse to sign unless the challenge matches the Tuple exactly.
-  const expectedUnits = req.amountCents * XSGD_UNITS_PER_CENT;
-  if (acc.chainId !== STRAITSX_CHAIN_ID[req.env]) {
-    return { ok: false, reason: `challenge chainId ${acc.chainId} != expected ${STRAITSX_CHAIN_ID[req.env]}` };
+  const accepted = parseAccepted(rawIntent.accepted);
+  if (!accepted) return "payment proof has a malformed x402 accepted entry";
+  if (accepted.scheme !== undefined && accepted.scheme !== "exact") {
+    return `unsupported x402 scheme ${accepted.scheme}`;
   }
-  if (acc.asset?.toLowerCase() !== XSGD_ASSET[req.env].toLowerCase()) {
-    return { ok: false, reason: `challenge asset ${acc.asset} is not the expected XSGD contract` };
+  if (
+    accepted.extra?.name !== undefined &&
+    accepted.extra.name !== "XSGD"
+  ) {
+    return "payment challenge has an unexpected token domain name";
   }
-  let demandedUnits: bigint;
+  if (
+    accepted.extra?.version !== undefined &&
+    accepted.extra.version !== "2"
+  ) {
+    return "payment challenge has an unexpected token domain version";
+  }
+  if (accepted.chainId !== STRAITSX_CHAIN_ID[expected.environment]) {
+    return `payment chainId ${accepted.chainId} does not match ${STRAITSX_CHAIN_ID[expected.environment]}`;
+  }
+  if (
+    accepted.asset.toLowerCase() !==
+    XSGD_ASSET[expected.environment].toLowerCase()
+  ) {
+    return "payment asset is not the expected XSGD contract";
+  }
+
+  const expectedUnits = expectedXsgdUnits(expected.amountCents);
+  let acceptedUnits: bigint;
+  let authorizedUnits: bigint;
+  let validAfter: bigint;
+  let validBefore: bigint;
   try {
-    demandedUnits = BigInt(acc.amount ?? "");
+    acceptedUnits = BigInt(accepted.amount);
+    authorizedUnits = BigInt(authorization.value as string);
+    validAfter = BigInt(authorization.validAfter as string);
+    validBefore = BigInt(authorization.validBefore as string);
   } catch {
-    return { ok: false, reason: `challenge amount is not parseable: ${acc.amount}` };
+    return "payment proof contains a non-numeric authorization value";
   }
-  if (demandedUnits !== expectedUnits) {
+  if (acceptedUnits !== expectedUnits) {
+    return `payment challenge demands ${acceptedUnits} XSGD units; the Tuple allows exactly ${expectedUnits}`;
+  }
+  if (authorizedUnits !== expectedUnits) {
+    return `payment authorizes ${authorizedUnits} XSGD units; the Tuple allows exactly ${expectedUnits}`;
+  }
+  if (
+    (authorization.from as string).toLowerCase() !==
+    expected.payerAddress.toLowerCase()
+  ) {
+    return "payment payer does not match the confirmed wallet";
+  }
+  if (
+    (authorization.to as string).toLowerCase() !== accepted.payTo.toLowerCase()
+  ) {
+    return "payment recipient does not match the x402 challenge";
+  }
+  if (!/^0x[0-9a-fA-F]{64}$/.test(authorization.nonce as string)) {
+    return "payment authorization nonce is malformed";
+  }
+  if (validAfter !== 0n) {
+    return "payment authorization has an unsupported start time";
+  }
+  if (validBefore <= validAfter) {
+    return "payment authorization has an invalid validity window";
+  }
+
+  if (expected.requireLiveAuthorization !== false) {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    if (validBefore <= now) return "payment authorization has expired";
+    if (
+      validBefore >
+      now + BigInt(MAX_PAYMENT_LIFETIME_SECONDS + CLOCK_SKEW_SECONDS)
+    ) {
+      return "payment authorization lifetime is longer than AgentPay allows";
+    }
+  }
+  return null;
+}
+
+export async function verifyPaymentProof(
+  proof: StraitsXPaymentProof,
+  expected: {
+    amountCents: bigint;
+    environment: StraitsXEnv;
+    payerAddress: `0x${string}`;
+  },
+): Promise<
+  { valid: true; authorizationHash: `0x${string}` } | MintFailure
+> {
+  if (!proof || typeof proof !== "object" || Array.isArray(proof)) {
+    return { ok: false, reason: "payment proof is malformed", paymentAttempted: false };
+  }
+  if (typeof proof.signature !== "string" || !/^0x[0-9a-fA-F]+$/.test(proof.signature)) {
+    return { ok: false, reason: "payment signature is malformed", paymentAttempted: false };
+  }
+
+  try {
+    const reason = validatePaymentIntent(proof.intent, expected);
+    if (reason) return { ok: false, reason, paymentAttempted: false };
+    const recovered = await recoverTypedDataAddress({
+      ...transferAuthorizationTypedData(proof.intent),
+      signature: proof.signature,
+    });
+    if (recovered.toLowerCase() !== expected.payerAddress.toLowerCase()) {
+      return {
+        ok: false,
+        reason: `payment signature recovers to ${recovered}, not the confirmed payer`,
+        paymentAttempted: false,
+      };
+    }
+    return {
+      valid: true,
+      authorizationHash: paymentAuthorizationHash(proof.intent),
+    };
+  } catch (error) {
     return {
       ok: false,
-      reason: `challenge demands ${demandedUnits} XSGD units; the confirmed Tuple allows exactly ${expectedUnits}`,
+      reason: `payment signature recovery failed: ${(error as Error).message}`,
+      paymentAttempted: false,
     };
   }
-  if (!acc.payTo) {
-    return { ok: false, reason: "challenge has no payTo address" };
+}
+
+export async function prepareCardMint(
+  input: PrepareMintRequest,
+): Promise<PrepareMintResult> {
+  if (!isAddress(input.payerAddress, { strict: false })) {
+    return { ok: false, reason: "payer address is malformed", paymentAttempted: false };
   }
 
-  // Step 3 — sign EIP-3009 TransferWithAuthorization for exactly the demand.
-  const now = Math.floor(Date.now() / 1000);
-  const authorization = {
-    from: account.address,
-    to: acc.payTo as `0x${string}`,
-    value: demandedUnits,
-    validAfter: 0n,
-    validBefore: BigInt(now + (acc.maxTimeoutSeconds ?? 300)),
-    nonce: `0x${randomBytes(32).toString("hex")}` as `0x${string}`,
-  };
-  const signature = await account.signTypedData({
-    domain: {
-      name: acc.extra?.name ?? "XSGD",
-      version: acc.extra?.version ?? "2",
-      chainId: acc.chainId,
-      // Byte-identical to acc.asset (asserted above); our canonical form
-      // carries the EIP-55 checksum viem requires.
-      verifyingContract: XSGD_ASSET[req.env],
-    },
-    types: {
-      TransferWithAuthorization: [
-        { name: "from", type: "address" },
-        { name: "to", type: "address" },
-        { name: "value", type: "uint256" },
-        { name: "validAfter", type: "uint256" },
-        { name: "validBefore", type: "uint256" },
-        { name: "nonce", type: "bytes32" },
-      ],
-    },
-    primaryType: "TransferWithAuthorization",
-    message: authorization,
-  });
-
-  // Transports-v2 shape: the chosen accepts entry is echoed back as `accepted`.
-  const paymentPayload = {
-    x402Version: challenge.x402Version ?? 1,
-    accepted: acc,
-    payload: {
-      signature,
-      authorization: {
-        from: authorization.from,
-        to: authorization.to,
-        value: demandedUnits.toString(),
-        validAfter: authorization.validAfter.toString(),
-        validBefore: authorization.validBefore.toString(),
-        nonce: authorization.nonce,
-      },
-    },
-  };
-  const header = Buffer.from(JSON.stringify(paymentPayload)).toString("base64");
-
-  // Step 4 — the paid retry. The facilitator settles on-chain first, then
-  // returns the card (SIG-020).
-  let r2: Response;
-  let card: Record<string, unknown>;
+  let status: number;
+  let challenge: X402Challenge;
   try {
-    r2 = await fetch(url, {
+    const response = await fetch(issueCardUrl(input.environment), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "PAYMENT-SIGNATURE": header },
-      body,
+      headers: { "Content-Type": "application/json" },
+      body: issueCardBody(input),
     });
-    card = (await r2.json()) as Record<string, unknown>;
-  } catch (e) {
-    return { ok: false, reason: `paid mint request failed: ${(e as Error).message}` };
+    status = response.status;
+    challenge = (await response.json()) as X402Challenge;
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `challenge request failed: ${(error as Error).message}`,
+      paymentAttempted: false,
+    };
   }
-  if (r2.status !== 200) {
-    const message = typeof card.message === "string" ? card.message : "no error message";
-    return { ok: false, reason: `mint rejected: HTTP ${r2.status} — ${message}` };
+
+  const accepted = parseAccepted(challenge.accepts?.[0]);
+  if (status !== 402 || !accepted) {
+    return {
+      ok: false,
+      reason: `expected a valid HTTP 402 challenge, got HTTP ${status}`,
+      paymentAttempted: false,
+    };
+  }
+
+  const timeout = Math.min(
+    accepted.maxTimeoutSeconds ?? MAX_PAYMENT_LIFETIME_SECONDS,
+    MAX_PAYMENT_LIFETIME_SECONDS,
+  );
+  const now = Math.floor(Date.now() / 1000);
+  const intent: StraitsXPaymentIntent = {
+    rail: "straitsx",
+    environment: input.environment,
+    x402Version: challenge.x402Version ?? 1,
+    accepted,
+    authorization: {
+      from: getAddress(input.payerAddress.toLowerCase()),
+      to: getAddress(accepted.payTo.toLowerCase()),
+      value: expectedXsgdUnits(input.amountCents).toString(),
+      validAfter: "0",
+      validBefore: String(now + timeout),
+      nonce: `0x${randomBytes(32).toString("hex")}`,
+    },
+  };
+
+  const reason = validatePaymentIntent(intent, {
+    amountCents: input.amountCents,
+    environment: input.environment,
+    payerAddress: input.payerAddress,
+  });
+  if (reason) {
+    return {
+      ok: false,
+      reason: `unsafe x402 challenge: ${reason}`,
+      paymentAttempted: false,
+    };
+  }
+
+  return {
+    ok: true,
+    intent,
+    authorizationHash: paymentAuthorizationHash(intent),
+  };
+}
+
+async function submitCardMint(
+  input: PrepareMintRequest,
+  proof: StraitsXPaymentProof,
+): Promise<MintResult> {
+  const paymentPayload = {
+    x402Version: proof.intent.x402Version,
+    accepted: proof.intent.accepted,
+    payload: {
+      signature: proof.signature,
+      authorization: proof.intent.authorization,
+    },
+  };
+  const paymentHeader = Buffer.from(
+    JSON.stringify(paymentPayload),
+  ).toString("base64");
+
+  let response: Response;
+  let rawText: string;
+  try {
+    response = await fetch(issueCardUrl(input.environment), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "PAYMENT-SIGNATURE": paymentHeader,
+      },
+      body: issueCardBody(input),
+    });
+    rawText = await response.text();
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `paid mint request failed: ${(error as Error).message}`,
+      paymentAttempted: true,
+    };
+  }
+  let card: Record<string, unknown> = {};
+  try {
+    card = JSON.parse(rawText) as Record<string, unknown>;
+  } catch {
+    // A paid request with an empty or malformed response is still consumed.
+  }
+  if (response.status !== 200) {
+    return {
+      ok: false,
+      reason: `mint rejected after payment: HTTP ${response.status}`,
+      paymentAttempted: true,
+    };
   }
 
   const settlementTx =
@@ -216,7 +448,11 @@ export async function mintCard(req: MintRequest): Promise<MintResult> {
   const cardOpaqueId =
     typeof card.card_opaque_id === "string" ? card.card_opaque_id : null;
   if (!settlementTx || !cardOpaqueId) {
-    return { ok: false, reason: "mint response missing settlement_tx or card_opaque_id" };
+    return {
+      ok: false,
+      reason: "mint response missing settlement_tx or card_opaque_id",
+      paymentAttempted: true,
+    };
   }
 
   return {
@@ -224,10 +460,48 @@ export async function mintCard(req: MintRequest): Promise<MintResult> {
     amountSgd:
       typeof card.amount_sgd === "string"
         ? card.amount_sgd
-        : (Number(req.amountCents) / 100).toFixed(2),
+        : (Number(input.amountCents) / 100).toFixed(2),
     settlementTx,
-    snowtraceUrl: snowtraceTxUrl(req.env, settlementTx),
+    snowtraceUrl: snowtraceTxUrl(input.environment, settlementTx),
     cardOpaqueId,
-    iframeUrl: typeof card.iframe_url === "string" ? card.iframe_url : undefined,
+    iframeUrl:
+      typeof card.iframe_url === "string" ? card.iframe_url : undefined,
   };
+}
+
+export async function mintCardWithPaymentProof(
+  input: UserFundedMintRequest,
+): Promise<MintResult> {
+  const verification = await verifyPaymentProof(input.proof, {
+    amountCents: input.amountCents,
+    environment: input.environment,
+    payerAddress: input.payerAddress,
+  });
+  if (!("valid" in verification)) return verification;
+  return submitCardMint(input, input.proof);
+}
+
+export async function mintCard(request: MintRequest): Promise<MintResult> {
+  const account = platformPayerAccount();
+  if (!account) {
+    return {
+      ok: false,
+      reason: "platform payer key is not configured",
+      paymentAttempted: false,
+    };
+  }
+
+  const input: PrepareMintRequest = {
+    amountCents: request.amountCents,
+    cardholderName: request.cardholderName,
+    environment: request.env,
+    payerAddress: account.address,
+  };
+  const prepared = await prepareCardMint(input);
+  if (!prepared.ok) return prepared;
+
+  const signature = await account.signTypedData(
+    transferAuthorizationTypedData(prepared.intent),
+  );
+  return submitCardMint(input, { intent: prepared.intent, signature });
 }
