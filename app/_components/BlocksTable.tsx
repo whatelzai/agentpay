@@ -33,7 +33,7 @@ const REASON_CLASS: Record<string, BlockClass> = {
   confirmation_sig_invalid: { label: "Invalid proof", tone: "proof" },
   payment_proof_invalid: { label: "Invalid proof", tone: "proof" },
   unsealed_v2_token: { label: "Protocol violation", tone: "proof" },
-  amount_out_of_card_range: { label: "Policy refusal", tone: "policy" },
+  amount_out_of_card_range: { label: "Rail limit refusal", tone: "operational" },
   capability_open_failed: { label: "Capability error", tone: "operational" },
   token_decode_failed: { label: "Capability error", tone: "operational" },
   chain_id_mismatch: { label: "Configuration", tone: "operational" },

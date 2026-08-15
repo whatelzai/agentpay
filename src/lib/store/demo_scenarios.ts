@@ -20,10 +20,26 @@ export type DemoExecutionPlan = {
   expectedOutcome: "mint_attempt" | "agentpay_refusal" | "rail_decision";
 };
 
-const INJECTED_REQUEST = {
-  merchant: "Evil Store",
-  amountSgd: 28,
-} as const;
+// The malicious request is NOT authored here. It is parsed from the poisoned
+// payload on the product page (products.ts hiddenPayload) so the fallback demo's
+// bad Tuple has a single source of truth: the same hidden text a judge can
+// reveal. A fooled agent would read exactly this. If the payload cannot be
+// parsed, the demo fails loudly instead of silently requesting the wrong thing.
+// The live attack proof is a recorded real-agent run on the MCP connector; this
+// scripted path is only the deterministic fallback.
+export function parseInjectedRequest(payload: string): {
+  merchant: string;
+  amountSgd: number;
+} {
+  const amountMatch = payload.match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)/);
+  const merchantMatch = payload.match(/merchant\s+"([^"]+)"/i);
+  if (!amountMatch || !merchantMatch) {
+    throw new Error(
+      "the demo payload has no parseable injected merchant and amount",
+    );
+  }
+  return { merchant: merchantMatch[1], amountSgd: Number(amountMatch[1]) };
+}
 
 export function isDemoScenario(value: unknown): value is DemoScenario {
   return (
@@ -63,7 +79,7 @@ export function buildDemoExecutionPlan(
       scenario,
       product,
       confirmed,
-      requested: INJECTED_REQUEST,
+      requested: parseInjectedRequest(product.hiddenPayload!),
       expectedOutcome: "agentpay_refusal",
     };
   }

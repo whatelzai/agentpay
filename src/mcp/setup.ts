@@ -15,13 +15,13 @@ import {
 import type { ToolContext } from "../lib/mcp/tools/types";
 import pkg from "../../package.json";
 
-export const AGENTPAY_INSTRUCTIONS = `AgentPay is the trust layer for AI-agent payments. It closes the prompt-injection gap that the card layer alone cannot.
+export const AGENTPAY_INSTRUCTIONS = `AgentPay is the trust layer for AI-agent payments. Agents will be wrong sometimes — injected, buggy, or compromised — and money is irreversible. AgentPay makes every spend provably bounded to signed human intent, whatever the agent does.
 
 Flow:
 1. Agent calls propose_purchase({merchant, amount_sgd}) → returns a URL for the user to open and sign, plus a request_id.
 2. In user_wallet mode, the user signs an exact XSGD payment authorization and an AgentPay Confirmation that binds request, merchant, amount, expiry, payer, rail, and payment hash. In platform_wallet demo mode, only the configured owner may confirm.
 3. AgentPay seals the signed payload so the agent never receives the reusable rail signature. The agent polls get_confirmation({request_id}) for the opaque capability.
-4. Agent calls execute_purchase(confirmation_token, merchant, amount) — AgentPay opens the capability and verifies the signer, funding model, payer, payment proof, payment hash, expiry, nonce freshness, and exact Tuple match. Mismatch → refuses with a visible diff and a Block Receipt, cryptographically signed when the receipt signer is configured. Match → mints a scoped card on the configured rail; get_receipt returns the proof chain.
+4. Agent calls execute_purchase(confirmation_token, merchant, amount) — AgentPay opens the capability and verifies the signer, funding model, payer, payment proof, payment hash, expiry, nonce freshness, and exact Tuple match. Mismatch → refuses with a visible diff and a Block Receipt, cryptographically signed when the receipt signer is configured. Match → mints a value- and time-scoped card on the configured rail; get_receipt returns the proof chain.
 
 Result: even if the agent's context is prompt-injected between confirmation and mint (from a web page, another agent, a tool response, or corrupted memory), the money can only move where the human signed.
 

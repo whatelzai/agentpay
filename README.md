@@ -2,7 +2,7 @@
 
 The trust layer that makes AI spend safely.
 
-Cryptographic confirmation binding for AI-agent payments — closes the prompt-injection gap that the card layer alone cannot. Cards handle credential theft. AgentPay handles the rest.
+Cryptographic confirmation binding for AI-agent payments. Agents will be wrong sometimes — injected, buggy, or compromised — and money is irreversible. AgentPay makes every spend provably bounded to signed human intent, whatever the agent does. Cards handle credential theft. AgentPay handles the rest.
 
 Built at the [StraitsX AgentiX Playground](https://straitsx.com), Singapore, 14–16 August 2026. Track: Agentic Payments Infrastructure.
 

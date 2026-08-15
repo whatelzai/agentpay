@@ -445,7 +445,7 @@ Block Receipt ${receipt.id} logged.`,
       {
         type: "text",
         text: [
-          "✓ PURCHASE EXECUTED — scoped card minted on the StraitsX rail.",
+          "✓ PURCHASE EXECUTED — value- and time-scoped card minted on the StraitsX rail.",
           "",
           JSON.stringify(
             {
@@ -465,7 +465,7 @@ Block Receipt ${receipt.id} logged.`,
           "",
           `receipt: ${receipt.id}`,
           "",
-          "Card credentials are withheld by design: the human views the card via the AgentPay view-card flow. The settlement transaction above is the public, on-chain proof that exactly the confirmed amount moved.",
+          "Card credentials are withheld by design: the agent never receives them (the human sees the card's last 4 digits and the settlement proof). The settlement transaction above is the public, on-chain proof that exactly the confirmed amount moved.",
         ].join("\n"),
       },
     ],
