@@ -1,0 +1,4 @@
+interface:
+  display_name: "Safe Spend Policy"
+  short_description: "Decide whether a purchase may reach confirmation"
+  default_prompt: "Use $safe-spend-policy to compare this purchase candidate with my original mandate before proposing payment."

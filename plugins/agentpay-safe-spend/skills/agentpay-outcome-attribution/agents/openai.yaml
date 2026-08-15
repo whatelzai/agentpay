@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentPay Outcome Attribution"
+  short_description: "Explain policy, protocol, rail, and settlement results"
+  default_prompt: "Use $agentpay-outcome-attribution to explain which layer allowed, refused, declined, or settled this purchase."

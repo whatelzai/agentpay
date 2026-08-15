@@ -1,21 +1,33 @@
 {
   "name": "agentpay-safe-spend",
-  "version": "0.1.0",
-  "description": "Safe-spend policy and protocol for AI-agent purchases.",
+  "version": "0.2.0",
+  "description": "Prompt-injection-aware discovery, policy, authorization, and outcome handling for AI-agent purchases.",
   "author": {
     "name": "AgentPay"
   },
+  "homepage": "https://agentpay-tan.vercel.app/",
+  "repository": "https://github.com/whatelzai/agentpay",
+  "keywords": [
+    "agent-payments",
+    "prompt-injection",
+    "safe-spend",
+    "mcp"
+  ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Agentpay Safe Spend",
-    "shortDescription": "Let agents spend only what a user explicitly authorizes.",
-    "longDescription": "AgentPay combines MCP tools, CLI workflows, and policy skills for prompt-injection-resistant agent payments.",
+    "displayName": "AgentPay Safe Spend",
+    "shortDescription": "Keep product content separate from spending authority.",
+    "longDescription": "One Codex bundle for untrusted shopping discovery, pre-confirmation policy, wallet-bound AgentPay authorization, and accurate outcome attribution. The AgentPay MCP is the hard execution gate; the companion CLI exposes the same operator workflow.",
     "developerName": "AgentPay",
     "category": "Productivity",
-    "capabilities": [],
+    "capabilities": [
+      "Interactive"
+    ],
+    "websiteURL": "https://agentpay-tan.vercel.app/",
     "defaultPrompt": [
-      "Use AgentPay to propose and execute a purchase safely.",
-      "Check that AgentPay is connected and explain its safety policy."
+      "Safely discover a product and run the AgentPay purchase flow.",
+      "Explain why this AgentPay purchase was blocked or declined.",
+      "Check AgentPay connectivity and explain its enforcement boundary."
     ]
   },
   "mcpServers": "./.mcp.json"

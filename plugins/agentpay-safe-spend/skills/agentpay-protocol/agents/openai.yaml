@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentPay Protocol"
+  short_description: "Run propose, authorization, execution, and receipt"
+  default_prompt: "Use $agentpay-protocol to run this policy-approved purchase through AgentPay safely."
