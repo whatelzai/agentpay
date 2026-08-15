@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true">
   <title>AgentPay</title>
-  <path d="M4 10 C 10 14, 14 20, 22 22" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" fill="none"/>
-  <circle cx="24" cy="22" r="3.25" fill="currentColor"/>
+  <rect width="32" height="32" rx="6" fill="#0b0f0d"/>
+  <path d="M4 10 C 10 14, 14 20, 22 22" stroke="#7dd88a" stroke-width="2.25" stroke-linecap="round" fill="none"/>
+  <circle cx="24" cy="22" r="3.25" fill="#7dd88a"/>
 </svg>
