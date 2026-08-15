@@ -24,6 +24,15 @@ export default function Home() {
           , Singapore — 14–16 August 2026. Track: Agentic Payments Infrastructure.
         </p>
 
+        <div className="mb-16 flex flex-wrap gap-3">
+          <a
+            href="/monitor"
+            className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20"
+          >
+            View public safety monitor
+          </a>
+        </div>
+
         <div className="pt-16 border-t border-neutral-800">
           <p className="text-sm font-medium text-neutral-500 mb-4 tracking-wider uppercase">
             Connect your agent
