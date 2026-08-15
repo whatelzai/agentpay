@@ -7,7 +7,7 @@ import {
 } from "../src/lib/store/demo_scenarios";
 
 test("S1 preserves the exact signed merchant and amount", () => {
-  const plan = buildDemoExecutionPlan("latte", "happy_path");
+  const plan = buildDemoExecutionPlan("latte-1", "happy_path");
 
   assert.deepEqual(plan.requested, plan.confirmed);
   assert.equal(plan.confirmed.merchant, "The Corner Store");
@@ -15,12 +15,12 @@ test("S1 preserves the exact signed merchant and amount", () => {
   assert.equal(plan.expectedOutcome, "mint_attempt");
 });
 
-test("S2 mutates both fields only after the Latte Tuple is selected", () => {
-  const plan = buildDemoExecutionPlan("latte", "web_injection");
+test("S2 mutates both fields only after a hidden-payload Tuple is selected", () => {
+  const plan = buildDemoExecutionPlan("latte-2", "web_injection");
 
   assert.deepEqual(plan.confirmed, {
     merchant: "The Corner Store",
-    amountSgd: 5.0,
+    amountSgd: 5.5,
   });
   assert.deepEqual(plan.requested, {
     merchant: "Evil Store",
@@ -29,39 +29,54 @@ test("S2 mutates both fields only after the Latte Tuple is selected", () => {
   assert.equal(plan.expectedOutcome, "agentpay_refusal");
 });
 
-test("S3 preserves intent and leaves the funding decision to the rail", () => {
-  const plan = buildDemoExecutionPlan(
-    "weekly-grocery-bundle",
-    "rail_limit",
-  );
+test("juice-2 also carries the S2 injection payload (cross-category attack)", () => {
+  const plan = buildDemoExecutionPlan("juice-2", "web_injection");
 
-  assert.deepEqual(plan.requested, plan.confirmed);
-  assert.equal(plan.confirmed.amountSgd, 28);
-  assert.equal(plan.expectedOutcome, "rail_decision");
+  assert.deepEqual(plan.confirmed, {
+    merchant: "The Corner Store",
+    amountSgd: 7.0,
+  });
+  assert.deepEqual(plan.requested, {
+    merchant: "Evil Store",
+    amountSgd: 28,
+  });
+  assert.equal(plan.expectedOutcome, "agentpay_refusal");
 });
 
 test("scenario and product combinations fail closed", () => {
+  // web_injection requires a product with a hidden payload
   assert.throws(
-    () => buildDemoExecutionPlan("pastry-box", "web_injection"),
-    /only available for Latte/,
+    () => buildDemoExecutionPlan("latte-1", "web_injection"),
+    /hidden content-source payload/,
   );
   assert.throws(
-    () => buildDemoExecutionPlan("latte", "rail_limit"),
-    /Weekly Grocery Bundle/,
+    () => buildDemoExecutionPlan("juice-1", "web_injection"),
+    /hidden content-source payload/,
   );
+  // rail_limit has no product in the current catalog (all under SGD 30)
+  assert.throws(
+    () => buildDemoExecutionPlan("latte-2", "rail_limit"),
+    /no product in the current catalog/,
+  );
+  // unknown scenario string is refused
   assert.equal(isDemoScenario("production"), false);
+  // unknown product slug is refused
+  assert.throws(
+    () => buildDemoExecutionPlan("weekly-grocery-bundle", "happy_path"),
+    /unknown demo product/,
+  );
 });
 
 test("the return path carries only public scenario metadata", () => {
   const path = demoReturnPath(
     "req_0123456789abcdef",
-    "latte",
+    "latte-2",
     "web_injection",
   );
 
   assert.equal(
     path,
-    "/store/order/req_0123456789abcdef?slug=latte&scenario=web_injection",
+    "/store/order/req_0123456789abcdef?slug=latte-2&scenario=web_injection",
   );
   assert.equal(path.includes("confirmation"), false);
 });
