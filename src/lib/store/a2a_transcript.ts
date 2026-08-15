@@ -22,11 +22,11 @@ export type TranscriptLine = {
 export const A2A_TRANSCRIPT: TranscriptLine[] = [
   {
     speaker: "shopping_agent",
-    text: "Got it — ordering the Latte, SGD 6.50, from The Corner Store. Calling propose_purchase(merchant=\"The Corner Store\", amount_sgd=6.50)…",
+    text: "Got it — ordering the Latte, SGD 5.00, from The Corner Store. Calling propose_purchase(merchant=\"The Corner Store\", amount_sgd=5.00)…",
   },
   {
     speaker: "agentpay",
-    text: "/confirm delivered. Waiting for the user to sign the Tuple: (The Corner Store, SGD 6.50).",
+    text: "/confirm delivered. Waiting for the user to sign the Tuple: (The Corner Store, SGD 5.00).",
   },
   { speaker: "user", text: "Signed ✓ — two linked EIP-712 signatures approved." },
   {
@@ -39,11 +39,11 @@ export const A2A_TRANSCRIPT: TranscriptLine[] = [
   },
   {
     speaker: "agentpay",
-    text: "⛔ EXECUTE REFUSED — agent request diverges from user signature.\n  merchant: agent asked \"Evil Store\", user confirmed \"The Corner Store\"\n  amount:   agent asked SGD 28.00, user confirmed SGD 6.50\nBlock Receipt logged. Money does not move.",
+    text: "⛔ EXECUTE REFUSED — agent request diverges from user signature.\n  merchant: agent asked \"Evil Store\", user confirmed \"The Corner Store\"\n  amount:   agent asked SGD 28.00, user confirmed SGD 5.00\nBlock Receipt logged. Money does not move.",
   },
   {
     speaker: "shopping_agent",
-    text: "Refused — the peer agent's instruction didn't match what the user signed. Falling back to the real order: completing the original SGD 6.50 Latte purchase.",
+    text: "Refused — the peer agent's instruction didn't match what the user signed. Falling back to the real order: completing the original SGD 5.00 Latte purchase.",
   },
   {
     speaker: "agentpay",

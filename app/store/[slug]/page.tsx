@@ -63,7 +63,7 @@ export default async function ProductPage({ params }: { params: Params }) {
                 S1 / Exact intent
               </p>
               <p className="my-3 text-sm leading-relaxed text-[#432b21]/75">
-                Sign Latte at SGD 6.50. The demo agent requests exactly that
+                Sign Latte at SGD 5.00. The demo agent requests exactly that
                 Tuple, so AgentPay can submit it to the sandbox rail.
               </p>
               <CheckoutButton
