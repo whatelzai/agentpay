@@ -83,6 +83,18 @@ export function ConfirmClient({
         account: address,
       });
 
+      // The signature pins chainId 43114; wallets refuse to sign it while
+      // another chain is active. Switch (and add if missing) first.
+      const chainId = await client.getChainId();
+      if (chainId !== avalanche.id) {
+        try {
+          await client.switchChain({ id: avalanche.id });
+        } catch {
+          await client.addChain({ chain: avalanche });
+          await client.switchChain({ id: avalanche.id });
+        }
+      }
+
       const signature = await client.signTypedData({
         account: address,
         domain: AGENTPAY_DOMAIN,

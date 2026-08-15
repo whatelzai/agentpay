@@ -14,8 +14,27 @@ export type VerificationResult =
   | { valid: true; recoveredAddress: `0x${string}` }
   | { valid: false; reason: string };
 
+// base64url without Buffer: the /confirm page encodes in the browser, the
+// MCP server decodes in Node. btoa/atob + TextEncoder exist in both.
+function toBase64Url(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function fromBase64Url(encoded: string): string {
+  const b64 =
+    encoded.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (encoded.length % 4)) % 4);
+  const binary = atob(b64);
+  return new TextDecoder().decode(
+    Uint8Array.from(binary, (c) => c.charCodeAt(0)),
+  );
+}
+
 export function encodeToken(payload: DecodedToken): string {
-  return Buffer.from(
+  return toBase64Url(
     JSON.stringify({
       merchant: payload.merchant,
       amountSgd: payload.amountSgd.toString(),
@@ -24,11 +43,11 @@ export function encodeToken(payload: DecodedToken): string {
       signature: payload.signature,
       signer: payload.signer,
     }),
-  ).toString("base64url");
+  );
 }
 
 export function decodeToken(token: string): DecodedToken {
-  const raw = Buffer.from(token, "base64url").toString("utf8");
+  const raw = fromBase64Url(token);
   const parsed = JSON.parse(raw) as Record<string, string>;
   if (
     !parsed.merchant ||
