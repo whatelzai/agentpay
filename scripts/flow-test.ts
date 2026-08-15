@@ -43,6 +43,7 @@ const FAKE_TX =
 // ── mock StraitsX rail ─────────────────────────────────────────────────────
 let fetchCalls: Array<{ paid: boolean; bodyAmountSgd: number }> = [];
 let tamperChallenge = false;
+let failPaidRetry = false;
 
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
@@ -75,6 +76,11 @@ globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
       },
       { status: 402 },
     );
+  }
+  if (failPaidRetry) {
+    // The live 2026-08-15 incident: settlement succeeded, issuance 500'd
+    // with an empty body and no card fields.
+    return new Response("", { status: 500 });
   }
   return Response.json(
     {
@@ -271,6 +277,33 @@ async function main() {
     check("nonce released → honest retry mints", !retry.result.isError, retry.text);
   }
 
+  console.log("S8b — rail fails AFTER payment (HTTP 500, empty body)");
+  {
+    const token = await makeToken({ merchant: "Book Store", amountCents: 650n });
+    failPaidRetry = true;
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: token,
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    failPaidRetry = false;
+    check("errors", result.isError === true);
+    check("payment reached the rail", fetchCalls.length === 2 && fetchCalls[1].paid);
+    check("says payment was sent", text.includes("AFTER payment"));
+    check("forbids retry", text.includes("Do NOT retry"));
+
+    const retry = await run({
+      confirmation_token: token,
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    check(
+      "nonce stays consumed → retry refused as replay",
+      retry.result.isError === true && retry.text.includes("already used"),
+    );
+  }
+
   console.log("S9 — Block Receipt is signed and verifiable");
   {
     const refusal = [...listReceipts()]
@@ -306,12 +339,13 @@ async function main() {
 
   console.log("S10 — get_receipt returns the proof chain / the signed refusal");
   {
-    const latest = await getReceiptTool(ctx, {});
+    const minted = [...listReceipts()].reverse().find((r) => r.type === "MINTED");
+    const latest = await getReceiptTool(ctx, { receipt_id: minted?.id });
     const latestText = latest.content
       .map((c) => (c.type === "text" ? c.text : ""))
       .join("\n");
     allResults.push(latestText);
-    check("latest receipt is the S8 retry mint", latestText.includes("MINTED"));
+    check("mint receipt renders the proof chain", latestText.includes("MINTED"));
     check("chain link 2: settlement tx", latestText.includes(FAKE_TX));
     check("chain link 3: snowtrace", latestText.includes("snowtrace.io/tx/"));
 
