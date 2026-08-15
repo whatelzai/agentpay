@@ -29,7 +29,27 @@ Open http://localhost:3000.
 - `npm run start` — serve production build
 - `npm run lint` — ESLint
 - `npm run typecheck` — TypeScript type check
-- `npm run mcp` — run stdio MCP server locally (for CLI use)
+- `npm run mcp` — run stdio MCP server locally
+- `npm run cli:dev` — run CLI from source via tsx (fast iteration)
+- `npm run build:cli` — bundle CLI to `dist/cli/index.mjs` via esbuild
+
+## CLI
+
+```bash
+# global install (once published)
+npm install -g @aisystemresources/agentpay
+
+# health check
+agentpay ping
+
+# request a confirmation URL for a purchase
+agentpay confirm --merchant "Starbucks" --amount 5.50
+
+# point at a different MCP endpoint (defaults to prod)
+agentpay ping --endpoint https://your-vercel-preview.vercel.app/api/mcp
+```
+
+Local dev without install: `./bin/agentpay.mjs <command>` after `npm run build:cli`.
 
 ## MCP endpoints
 
@@ -46,8 +66,9 @@ Consumer connect targets (documented on the landing page): **Claude.ai** (in-app
 ## Phases
 
 - **Phase 1:** ✅ Landing page.
-- **Phase 2 (current):** MCP server (HTTP + stdio) with `ping` + `confirm_purchase` (stub).
-- **Phase 3:** CLI at `cli/` with commander + cryptographic EIP-712 confirmation signing + wire to live StraitsX card MCP.
+- **Phase 2:** ✅ MCP server (HTTP + stdio) with `ping` + `confirm_purchase` (stub).
+- **Phase 3a (current):** CLI scaffold with commander + esbuild bundle. `agentpay ping` and `agentpay confirm` work against the deployed MCP.
+- **Phase 3b:** Cryptographic EIP-712 confirmation signing on `/confirm` page + `request_card_mint` MCP tool wired to live StraitsX card MCP.
 
 ## Process
 
