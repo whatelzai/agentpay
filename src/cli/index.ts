@@ -20,9 +20,9 @@ program
   });
 
 program
-  .command("confirm")
+  .command("propose")
   .description(
-    "Request a signed confirmation URL for a purchase. Prints the URL for the user to open and sign.",
+    "Propose a purchase — prints a confirmation URL for the user to open and sign.",
   )
   .requiredOption("-m, --merchant <name>", "Merchant to purchase from")
   .requiredOption("-a, --amount <sgd>", "Amount in SGD", parseFloat)
@@ -40,7 +40,7 @@ program
       expiry: number;
       endpoint: string;
     }) => {
-      await callTool(opts.endpoint, "confirm_purchase", {
+      await callTool(opts.endpoint, "propose_purchase", {
         merchant: opts.merchant,
         amount_sgd: opts.amount,
         expiry_seconds: opts.expiry,
@@ -49,9 +49,9 @@ program
   );
 
 program
-  .command("mint")
+  .command("execute")
   .description(
-    "Request a card mint against a signed confirmation_token. Verifies signature + (merchant, amount) match. Prompt-injection defence in action.",
+    "Execute a confirmed purchase against a signed confirmation_token. Verifies signature + (merchant, amount) match. Prompt-injection defence in action.",
   )
   .requiredOption(
     "-t, --token <base64>",
@@ -74,7 +74,7 @@ program
       amount: number;
       endpoint: string;
     }) => {
-      await callTool(opts.endpoint, "request_card_mint", {
+      await callTool(opts.endpoint, "execute_purchase", {
         confirmation_token: opts.token,
         merchant: opts.merchant,
         amount_sgd: opts.amount,

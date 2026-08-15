@@ -46,8 +46,11 @@ npm install -g @aisystemresources/agentpay
 # health check
 agentpay ping
 
-# request a confirmation URL for a purchase
-agentpay confirm --merchant "Starbucks" --amount 5.50
+# propose a purchase — get a confirmation URL for the user to sign
+agentpay propose --merchant "Starbucks" --amount 5.50
+
+# after signing, execute the purchase against the token
+agentpay execute --token <base64-token> --merchant "Starbucks" --amount 5.50
 
 # point at a different MCP endpoint (defaults to prod)
 agentpay ping --endpoint https://your-vercel-preview.vercel.app/api/mcp
@@ -70,9 +73,10 @@ Consumer connect targets (documented on the landing page): **Claude.ai** (in-app
 ## Phases
 
 - **Phase 1:** ✅ Landing page.
-- **Phase 2:** ✅ MCP server (HTTP + stdio) with `ping` + `confirm_purchase` (stub).
-- **Phase 3a (current):** CLI scaffold with commander + esbuild bundle. `agentpay ping` and `agentpay confirm` work against the deployed MCP.
-- **Phase 3b:** Cryptographic EIP-712 confirmation signing on `/confirm` page + `request_card_mint` MCP tool wired to live StraitsX card MCP.
+- **Phase 2:** ✅ MCP server (HTTP + stdio).
+- **Phase 3a:** ✅ CLI scaffold with commander + esbuild bundle.
+- **Phase 3b:** ✅ Cryptographic EIP-712 confirmation signing on `/confirm` page + the Mint Gate (verify, then stub).
+- **Phase 3c (current):** Tool surface renamed to `propose_purchase` / `execute_purchase`; real StraitsX mint via x402 behind the Binding.
 
 ## Process
 

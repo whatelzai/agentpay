@@ -1,7 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolContext } from "./types";
 
-export async function confirmPurchase(
+export async function proposePurchase(
   _ctx: ToolContext,
   args: Record<string, unknown>,
 ): Promise<CallToolResult> {
@@ -43,9 +43,7 @@ export async function confirmPurchase(
           "",
           "The user will sign an EIP-712 typed data message binding (merchant, amount, expiry, nonce). After signing, they receive a base64 confirmation_token — ask them to paste it back into the chat.",
           "",
-          "Once you have the token, call request_card_mint(confirmation_token=<token>, merchant, amount_sgd). AgentPay recovers the signer, verifies expiry, and asserts (merchant, amount) in your mint request match the signed values. Divergence → refuses the mint with a visible diff.",
-          "",
-          "[Phase 3b: signature verification is live. Actual StraitsX card issuance is stubbed and ships in phase 3c.]",
+          "Once you have the token, call execute_purchase(confirmation_token=<token>, merchant, amount_sgd). AgentPay recovers the signer, verifies expiry, and asserts (merchant, amount) in your mint request match the signed values. Divergence → refuses the mint with a visible diff.",
         ].join("\n"),
       },
     ],

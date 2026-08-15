@@ -160,7 +160,7 @@ export function ConfirmClient({
             Copy token to clipboard
           </button>
           <p className="text-xs text-neutral-500 mt-4">
-            Ask your agent: <em className="text-neutral-300">&ldquo;Call the AgentPay request_card_mint tool with confirmation_token=&lt;paste&gt;, merchant=&ldquo;{merchant}&rdquo;, amount_sgd={amount}.&rdquo;</em>
+            Ask your agent: <em className="text-neutral-300">&ldquo;Call the AgentPay execute_purchase tool with confirmation_token=&lt;paste&gt;, merchant=&ldquo;{merchant}&rdquo;, amount_sgd={amount}.&rdquo;</em>
           </p>
         </div>
       )}
