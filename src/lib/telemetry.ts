@@ -21,6 +21,8 @@ export type SpendAttemptInput = {
   signerAddress?: string;
   merchant?: string;
   amountSgdCents?: number;
+  signedMerchant?: string;
+  signedAmountSgdCents?: number;
   rail?: string;
   railStatus?: string;
   evidenceUri?: string;
@@ -53,6 +55,8 @@ export async function recordSpendAttempt(
       signer_address: input.signerAddress ?? null,
       merchant: input.merchant ?? null,
       amount_sgd_cents: input.amountSgdCents ?? null,
+      signed_merchant: input.signedMerchant ?? null,
+      signed_amount_sgd_cents: input.signedAmountSgdCents ?? null,
       rail: input.rail ?? null,
       rail_status: input.railStatus ?? null,
       evidence_uri: input.evidenceUri ?? null,
@@ -60,6 +64,32 @@ export async function recordSpendAttempt(
     if (error) console.error("[telemetry] spend_attempt:", error.message);
   } catch (err) {
     console.error("[telemetry] spend_attempt threw:", (err as Error).message);
+  }
+}
+
+export type RecentBlock = {
+  correlation_id: string;
+  reason_code: string | null;
+  merchant: string | null;
+  amount_sgd_cents: number | null;
+  signed_merchant: string | null;
+  signed_amount_sgd_cents: number | null;
+  created_at: string;
+};
+
+export async function fetchRecentBlocks(
+  limit = 5,
+): Promise<RecentBlock[] | null> {
+  if (!isConfigured()) return null;
+  try {
+    const client = supabaseAdmin();
+    const { data, error } = await client.rpc("recent_blocks", {
+      limit_count: limit,
+    });
+    if (error) return null;
+    return (data as RecentBlock[]) ?? [];
+  } catch {
+    return null;
   }
 }
 

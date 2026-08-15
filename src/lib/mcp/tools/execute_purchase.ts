@@ -38,8 +38,10 @@ async function record(
     rail?: string;
     railStatus?: string;
     evidenceUri?: string;
+    confirmed?: { merchant: string; amountSgdCents: bigint | number };
   } = {},
 ): Promise<void> {
+  const { confirmed, ...rest } = extras;
   await recordSpendAttempt({
     correlationId,
     outcome,
@@ -47,7 +49,12 @@ async function record(
     reasonCode,
     merchant: requested.merchant,
     amountSgdCents: Number(requested.amountSgdCents),
-    ...extras,
+    signedMerchant: confirmed?.merchant,
+    signedAmountSgdCents:
+      confirmed?.amountSgdCents != null
+        ? Number(confirmed.amountSgdCents)
+        : undefined,
+    ...rest,
   });
 }
 
@@ -317,6 +324,7 @@ Block Receipt ${receipt.id} logged.`,
     });
     await record(correlationId, "refused_mismatch", "tuple_diverged", requested, {
       signerAddress: verification.recoveredAddress,
+      confirmed,
     });
     return refusal(
       [
