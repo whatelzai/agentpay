@@ -48,6 +48,40 @@ program
     },
   );
 
+program
+  .command("mint")
+  .description(
+    "Request a card mint against a signed confirmation_token. Verifies signature + (merchant, amount) match. Prompt-injection defence in action.",
+  )
+  .requiredOption(
+    "-t, --token <base64>",
+    "Base64 confirmation token from /confirm page",
+  )
+  .requiredOption(
+    "-m, --merchant <name>",
+    "Merchant to mint for (must match signed token)",
+  )
+  .requiredOption(
+    "-a, --amount <sgd>",
+    "Amount in SGD (must match signed token)",
+    parseFloat,
+  )
+  .option("-e, --endpoint <url>", "MCP endpoint URL", DEFAULT_ENDPOINT)
+  .action(
+    async (opts: {
+      token: string;
+      merchant: string;
+      amount: number;
+      endpoint: string;
+    }) => {
+      await callTool(opts.endpoint, "request_card_mint", {
+        confirmation_token: opts.token,
+        merchant: opts.merchant,
+        amount_sgd: opts.amount,
+      });
+    },
+  );
+
 async function callTool(
   endpoint: string,
   name: string,

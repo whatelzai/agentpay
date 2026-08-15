@@ -42,8 +42,9 @@ When making architectural or scope decisions, refer to (and update) the vault. D
 
 - **Phase 1:** ✅ Vercel-deployed landing page. Shipped.
 - **Phase 2:** ✅ MCP server (HTTP + stdio). Shipped.
-- **Phase 3a (current):** CLI scaffold — `src/cli/index.ts` (commander), `bin/agentpay.mjs` (shebang wrapper), `scripts/build-cli.mjs` (esbuild bundle to `dist/cli/index.mjs`). Two commands: `agentpay ping` and `agentpay confirm`. Package config: bin + files + publishConfig ready for `npm publish` as `@aisystemresources/agentpay`.
-- **Phase 3b:** Cryptographic EIP-712 confirmation signing on `/confirm` page (replaces stub). `request_card_mint` MCP tool wired to live StraitsX card MCP at `card.straitsx.ai/production/sse`. CLI gains a `mint` command that verifies the signature and pings the card MCP.
+- **Phase 3a:** ✅ CLI scaffold — `src/cli/index.ts` (commander), `bin/agentpay.mjs` (shebang wrapper), `scripts/build-cli.mjs` (esbuild bundle). Commands: `agentpay ping`, `agentpay confirm`, `agentpay mint`.
+- **Phase 3b (current):** EIP-712 cryptographic signing on `/confirm` page. `src/lib/binding/{schema,verify}.ts` defines the typed data + verify utility (viem). `app/confirm/ConfirmClient.tsx` handles wallet connect + sign + token display. New `request_card_mint` MCP tool decodes the token, recovers the signer, verifies expiry, and refuses on (merchant, amount) mismatch with a visible diff. Actual StraitsX mint is stubbed — returns authorization result only.
+- **Phase 3c:** Wire the mint stub to the live StraitsX card MCP at `card.straitsx.ai/production/sse`. Requires mcp-inspector session on the sandbox endpoint to capture the actual tool schema (per RES-001 v2 to-do).
 
 ## MCP endpoints
 
