@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { HeroConnect } from "./_components/HeroConnect";
 import { FeedbackForm } from "./_components/FeedbackForm";
+import { BlocksTable } from "./_components/BlocksTable";
+import { buildKpiRects, KpiRects } from "./_components/KpiRects";
 import { fetchKpiSnapshot } from "@/src/lib/supabase/server";
+import { fetchRecentBlocks } from "@/src/lib/telemetry";
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 function Mark({ className = "" }: { className?: string }) {
   return (
@@ -35,31 +38,11 @@ function Kicker({ children }: { children: React.ReactNode }) {
 }
 
 export default async function Home() {
-  const kpi = await fetchKpiSnapshot();
-
-  const cards = [
-    {
-      label: "Unauthorized",
-      value: kpi ? kpi.unauthorized_spends.toString() : "0",
-      note: "Payments moved without a matching signature",
-      target: "target: 0",
-    },
-    {
-      label: "Attacks blocked",
-      value: kpi ? kpi.attacks_blocked.toString() : "0",
-      note: "Mint refused because agent request diverged from signed intent",
-      target: `last ${kpi?.window_days ?? 30}d`,
-    },
-    {
-      label: "Median sign",
-      value:
-        kpi?.median_sign_time_ms != null
-          ? `${(kpi.median_sign_time_ms / 1000).toFixed(1)}s`
-          : "—",
-      note: "Wall-clock median from opening a confirmation to signing it",
-      target: "target: <60s",
-    },
-  ];
+  const [kpi, blocks] = await Promise.all([
+    fetchKpiSnapshot(),
+    fetchRecentBlocks(5),
+  ]);
+  const cards = buildKpiRects(kpi);
 
   return (
     <main className="bg-void text-ink">
@@ -122,27 +105,23 @@ export default async function Home() {
           </Link>
           .
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-14">
-          {cards.map((c) => (
-            <div key={c.label} className="border-t border-ink/40 pt-6">
-              <p className="text-[10px] tracking-[0.22em] uppercase text-muted font-mono mb-6">
-                {c.label}
-              </p>
-              <p className="font-body font-semibold text-6xl md:text-7xl text-ink tabular-nums leading-none mb-6 tracking-[-0.04em]">
-                {c.value}
-              </p>
-              <p className="text-sm text-ink/70 leading-relaxed mb-3">
-                {c.note}
-              </p>
-              <p className="text-[10px] tracking-[0.18em] uppercase text-muted font-mono">
-                {c.target}
-              </p>
-            </div>
-          ))}
-        </div>
+        <KpiRects items={cards} />
       </section>
 
-      {/* Section 3 — Feedback */}
+      {/* Section 3 — Refused mints table */}
+      <section className="max-w-6xl mx-auto px-6 md:px-10 py-28 border-t border-rule">
+        <Kicker>Refused mints · recent</Kicker>
+        <h2 className="font-body font-semibold text-3xl md:text-5xl tracking-[-0.03em] mt-6 mb-3">
+          What the binding just refused.
+        </h2>
+        <p className="text-sm text-muted mb-14 max-w-2xl font-mono leading-relaxed">
+          Every refusal is a real row from the sandbox. Neon marks the field
+          the agent tried to change after the human signed.
+        </p>
+        <BlocksTable blocks={blocks ?? []} />
+      </section>
+
+      {/* Section 4 — Feedback */}
       <section className="max-w-2xl mx-auto px-6 md:px-10 py-28 border-t border-rule">
         <Kicker>Drop a comment</Kicker>
         <h2 className="font-body font-semibold text-3xl md:text-5xl tracking-[-0.03em] mt-6 mb-3">
