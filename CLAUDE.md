@@ -38,6 +38,26 @@ When making architectural or scope decisions, refer to (and update) the vault. D
 - Never force-push to main
 - Never commit `.env*` (only `.env.example`)
 
+## CLI release (npm publish)
+
+Auto-publishes via `.github/workflows/release.yml` when any commit on main bumps `package.json .version`.
+
+- Trigger: push to main + version change detected (HEAD vs HEAD~1)
+- Uses npm Trusted Publisher (OIDC) — no `NPM_TOKEN` secret needed
+- Publishes with `--provenance` for supply-chain attestation
+- Tags `v$VERSION` after successful publish
+- Workflow filename is pinned in npm Trusted Publisher config — do not rename
+
+**One-time npm setup (already done? verify):**
+1. Manual bootstrap publish: `npm publish --access public` (needs npm login as owner of `@aisystemresources` scope)
+2. npmjs.com → package settings → Publishing access → Add Trusted Publisher → GitHub Actions → org: `whatelzai`, repo: `agentpay`, workflow filename: `release.yml`, environment: (leave blank)
+3. After that, every version bump on main auto-publishes.
+
+**To release:**
+- In your PR, bump `package.json .version` (patch for bugfix, minor for new CLI verb/flag, major for breaking)
+- Merge to main via the usual automerge flow
+- Release workflow detects the bump, builds, publishes, tags
+
 ## Phases
 
 - **Phase 1:** ✅ Vercel-deployed landing page. Shipped.
