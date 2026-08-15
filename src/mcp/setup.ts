@@ -9,6 +9,7 @@ import {
   proposePurchase,
   executePurchase,
   getReceiptTool,
+  getConfirmationTool,
 } from "../lib/mcp/tools/index";
 import type { ToolContext } from "../lib/mcp/tools/types";
 import pkg from "../../package.json";
@@ -16,9 +17,10 @@ import pkg from "../../package.json";
 export const AGENTPAY_INSTRUCTIONS = `AgentPay is the trust layer for AI-agent payments. It closes the prompt-injection gap that the card layer alone cannot.
 
 Flow:
-1. Agent calls propose_purchase({merchant, amount_sgd}) → returns a URL for the user to open and sign.
-2. User signs the (merchant, amount, expiry, nonce) tuple in the browser via EIP-712 typed data — produces a base64-encoded confirmation_token containing the signature.
-3. Agent calls execute_purchase(confirmation_token, merchant, amount) — AgentPay decodes the token, recovers the signer, verifies expiry, and asserts (merchant, amount) in the mint request match the signed values. Mismatch → refuses with a visible diff.
+1. Agent calls propose_purchase({merchant, amount_sgd}) → returns a URL for the user to open and sign, plus a request_id.
+2. User signs the (merchant, amount, expiry, nonce) tuple in the browser via EIP-712 typed data — the signed confirmation_token is delivered back to AgentPay automatically.
+3. Agent polls get_confirmation({request_id}) until the token arrives (fallback: the user pastes the token into the chat).
+4. Agent calls execute_purchase(confirmation_token, merchant, amount) — AgentPay decodes the token, recovers the signer, verifies expiry, owner, and nonce freshness, and asserts (merchant, amount) in the mint request match the signed values. Mismatch → refuses with a visible diff and a signed Block Receipt. Match → mints a scoped card on the StraitsX rail; get_receipt returns the proof chain.
 
 Result: even if the agent's context is prompt-injected between confirmation and mint (from a web page, another agent, a tool response, or corrupted memory), the money can only move where the human signed.
 
@@ -83,6 +85,21 @@ export const AGENTPAY_TOOLS = [
     },
   },
   {
+    name: "get_confirmation",
+    description:
+      "Poll for the user's signed confirmation. Returns the confirmation_token once the user has signed on the /confirm page; before that, reports pending. Pass the request_id that propose_purchase returned.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        request_id: {
+          type: "string",
+          description: "Request id (req_…) from propose_purchase.",
+        },
+      },
+      required: ["request_id"],
+    },
+  },
+  {
     name: "get_receipt",
     description:
       "Fetch the receipt of a Mint Gate outcome — the proof chain of a mint (signed Tuple → settlement tx → Snowtrace link) or the signed Block Receipt of a refusal (requested vs confirmed, reason). Omit receipt_id for the most recent receipt. Receipts contain no card credentials.",
@@ -124,6 +141,8 @@ export function buildAgentPayServer(ctx: ToolContext): Server {
           return await proposePurchase(ctx, a);
         case "execute_purchase":
           return await executePurchase(ctx, a);
+        case "get_confirmation":
+          return await getConfirmationTool(ctx, a);
         case "get_receipt":
           return await getReceiptTool(ctx, a);
         default:

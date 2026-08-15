@@ -13,6 +13,9 @@ import { AGENTPAY_DOMAIN, CONFIRMATION_TYPES } from "../src/lib/binding/schema";
 import { encodeToken } from "../src/lib/binding/verify";
 import { executePurchase } from "../src/lib/mcp/tools/execute_purchase";
 import { getReceiptTool } from "../src/lib/mcp/tools/get_receipt";
+import { proposePurchase } from "../src/lib/mcp/tools/propose_purchase";
+import { getConfirmationTool } from "../src/lib/mcp/tools/get_confirmation";
+import { putConfirmation } from "../src/lib/confirmations";
 import {
   listReceipts,
   BLOCK_RECEIPT_DOMAIN,
@@ -327,7 +330,41 @@ async function main() {
     check("unknown id errors cleanly", missing.isError === true);
   }
 
-  console.log("S11 — REDACTION SWEEP: no credential material in any agent-visible output");
+  console.log("S11 — confirmation hand-off: propose → sign → poll");
+  {
+    const proposal = await proposePurchase(ctx, {
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    const proposalText = proposal.content
+      .map((c) => (c.type === "text" ? c.text : ""))
+      .join("\n");
+    allResults.push(proposalText);
+    const rid = proposalText.match(/req_[0-9a-f]{16}/)?.[0];
+    check("proposal carries a request_id", Boolean(rid));
+    check("confirm URL carries rid", proposalText.includes(`rid=${rid}`));
+
+    const pending = await getConfirmationTool(ctx, { request_id: rid });
+    const pendingText = pending.content
+      .map((c) => (c.type === "text" ? c.text : ""))
+      .join("\n");
+    check("pending before the user signs", pendingText.includes("pending"));
+
+    const token = await makeToken({ merchant: "Book Store", amountCents: 650n });
+    check("first write stored", putConfirmation(rid!, token) === "stored");
+    check("second write refused", putConfirmation(rid!, token) === "duplicate");
+    check("garbage token refused", putConfirmation(rid!, "not-a-token") === "invalid");
+
+    const confirmed = await getConfirmationTool(ctx, { request_id: rid });
+    const confirmedText = confirmed.content
+      .map((c) => (c.type === "text" ? c.text : ""))
+      .join("\n");
+    allResults.push(confirmedText);
+    check("poll returns the token", confirmedText.includes(token));
+    check("poll points at execute_purchase", confirmedText.includes("execute_purchase"));
+  }
+
+  console.log("S12 — REDACTION SWEEP: no credential material in any agent-visible output");
   {
     const everything = JSON.stringify(allResults) + JSON.stringify(listReceipts());
     check("no card_html", !everything.includes("card_html"));
