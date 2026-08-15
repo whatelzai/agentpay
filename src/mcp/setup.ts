@@ -4,9 +4,9 @@ import {
   ListToolsRequestSchema,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ping, confirmPurchase } from "../lib/mcp/tools/index.js";
-import type { ToolContext } from "../lib/mcp/tools/types.js";
-import pkg from "../../package.json" with { type: "json" };
+import { ping, confirmPurchase } from "../lib/mcp/tools/index";
+import type { ToolContext } from "../lib/mcp/tools/types";
+import pkg from "../../package.json";
 
 export const AGENTPAY_INSTRUCTIONS = `AgentPay is the trust layer for AI-agent payments. It closes the prompt-injection gap that the card layer alone cannot.
 

@@ -1,6 +1,6 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type { ToolContext } from "./types.js";
-import pkg from "../../../../package.json" with { type: "json" };
+import type { ToolContext } from "./types";
+import pkg from "../../../../package.json";
 
 export async function ping(ctx: ToolContext): Promise<CallToolResult> {
   return {

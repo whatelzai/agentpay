@@ -1,2 +1,2 @@
-export { ping } from "./ping.js";
-export { confirmPurchase } from "./confirm_purchase.js";
+export { ping } from "./ping";
+export { confirmPurchase } from "./confirm_purchase";

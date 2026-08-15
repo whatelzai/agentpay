@@ -1,6 +1,6 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { buildAgentPayServer } from "./setup.js";
-import type { ToolContext } from "../lib/mcp/tools/types.js";
+import { buildAgentPayServer } from "./setup";
+import type { ToolContext } from "../lib/mcp/tools/types";
 
 const ctx: ToolContext = { mode: "stdio" };
 const server = buildAgentPayServer(ctx);

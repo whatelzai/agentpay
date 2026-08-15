@@ -1,5 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type { ToolContext } from "./types.js";
+import type { ToolContext } from "./types";
 
 export async function confirmPurchase(
   _ctx: ToolContext,
