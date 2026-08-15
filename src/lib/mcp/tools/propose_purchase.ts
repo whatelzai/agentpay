@@ -36,7 +36,7 @@ export async function proposePurchase(
       content: [
         {
           type: "text",
-          text: "Error: amount_sgd must use whole cents and be within the 5-30 SGD card range.",
+          text: "Error: amount_sgd must use whole cents and be within the 5-50 SGD card range.",
         },
       ],
       isError: true,

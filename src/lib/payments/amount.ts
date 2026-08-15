@@ -1,5 +1,5 @@
 export const MIN_CARD_AMOUNT_CENTS = 500n;
-export const MAX_CARD_AMOUNT_CENTS = 3_000n;
+export const MAX_CARD_AMOUNT_CENTS = 5_000n;
 
 export function sgdToCents(value: unknown): bigint | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {

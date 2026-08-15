@@ -61,10 +61,10 @@ export function buildDemoExecutionPlan(
     );
   }
   if (scenario === "rail_limit") {
-    // The rail-limit scenario needs a product priced outside the SGD 5–30
+    // The rail-limit scenario needs a product priced outside the SGD 5–50
     // card range. The current latte/juice catalog stays within that range, so
     // this scenario is not wired to any product yet. Teammates: add a product
-    // priced > SGD 30 and re-target this branch when the scenario is needed.
+    // priced > SGD 50 and re-target this branch when the scenario is needed.
     throw new Error(
       "the rail-limit scenario has no product in the current catalog",
     );

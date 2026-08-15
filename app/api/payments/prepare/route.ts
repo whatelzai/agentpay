@@ -48,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
   }
   if (!isSupportedCardAmount(amountCents)) {
     return Response.json(
-      { error: "amount_sgd must be within the 5-30 SGD card range" },
+      { error: "amount_sgd must be within the 5-50 SGD card range" },
       { status: 400 },
     );
   }

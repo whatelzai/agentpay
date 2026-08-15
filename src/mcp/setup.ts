@@ -70,7 +70,7 @@ export const AGENTPAY_TOOLS = [
         },
         amount_sgd: {
           type: "number",
-          description: "Amount in SGD. The card rail accepts 5–30 SGD.",
+          description: "Amount in SGD. The card rail accepts 5–50 SGD.",
         },
         expiry_seconds: {
           type: "number",
