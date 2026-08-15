@@ -37,7 +37,7 @@ export function FeedbackForm() {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-6">
       <input
         type="email"
         required
@@ -45,7 +45,7 @@ export function FeedbackForm() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         maxLength={254}
-        className="w-full bg-transparent border-b border-rule px-0 py-2 text-ink placeholder:text-muted focus:outline-none focus:border-ink transition-colors"
+        className="w-full bg-transparent border-b border-rule px-0 py-3 text-ink placeholder:text-muted focus:outline-none focus:border-neon transition-colors"
         aria-label="Email"
       />
       <textarea
@@ -56,14 +56,14 @@ export function FeedbackForm() {
         rows={4}
         minLength={1}
         maxLength={4000}
-        className="w-full bg-transparent border-b border-rule px-0 py-2 text-ink placeholder:text-muted focus:outline-none focus:border-ink transition-colors resize-none"
+        className="w-full bg-transparent border-b border-rule px-0 py-3 text-ink placeholder:text-muted focus:outline-none focus:border-neon transition-colors resize-none"
         aria-label="Comment"
       />
       <div className="flex items-center gap-4 flex-wrap pt-2">
         <button
           type="submit"
           disabled={status === "sending" || status === "sent"}
-          className="bg-ink text-paper px-6 py-2.5 text-sm hover:bg-seal transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+          className="bg-neon text-void px-6 py-2.5 text-sm hover:bg-ink hover:text-neon transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium font-mono uppercase tracking-[0.14em]"
         >
           {status === "sending"
             ? "Sending…"
@@ -72,10 +72,10 @@ export function FeedbackForm() {
               : "Send"}
         </button>
         {status === "error" && (
-          <p className="text-sm text-seal">{errorMsg}</p>
+          <p className="text-sm text-neon font-mono">{errorMsg}</p>
         )}
         {status === "sent" && (
-          <p className="text-sm text-muted italic">Thanks — got it.</p>
+          <p className="text-sm text-muted font-mono">— got it.</p>
         )}
       </div>
     </form>
