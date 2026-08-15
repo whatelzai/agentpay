@@ -294,7 +294,7 @@ export function ConfirmClient({
   return (
     <div className="space-y-4">
       {fundingMode === "user_wallet" && !token && (
-        <p className="rounded border border-emerald-900 bg-emerald-950/30 p-3 text-xs leading-relaxed text-emerald-200">
+        <p className="border border-neon/30 bg-neon/[0.04] p-4 font-mono text-xs leading-relaxed text-ink/80">
           Your wallet funds this purchase. You will approve two signatures: one
           exact XSGD payment authorization and one AgentPay confirmation that
           binds that authorization to this purchase. No private key reaches
@@ -306,7 +306,7 @@ export function ConfirmClient({
         <button
           onClick={connect}
           disabled={busy}
-          className="w-full rounded bg-emerald-500 px-6 py-3 font-semibold text-black transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full bg-neon px-6 py-3 font-mono text-sm font-medium uppercase tracking-[0.14em] text-void transition-colors hover:bg-ink hover:text-neon disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? "Connecting..." : "Connect wallet"}
         </button>
@@ -314,16 +314,16 @@ export function ConfirmClient({
 
       {address && !token && (
         <>
-          <p className="text-sm text-neutral-500">
+          <p className="font-mono text-sm text-muted">
             Connected:{" "}
-            <code className="text-xs text-emerald-400">
+            <code className="text-xs text-neon">
               {address.slice(0, 6)}...{address.slice(-4)}
             </code>
           </p>
           <button
             onClick={sign}
             disabled={busy}
-            className="w-full rounded bg-emerald-500 px-6 py-3 font-semibold text-black transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full bg-neon px-6 py-3 font-mono text-sm font-medium uppercase tracking-[0.14em] text-void transition-colors hover:bg-ink hover:text-neon disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy ? "Waiting for signatures..." : "Authorize exact purchase"}
           </button>
@@ -332,40 +332,40 @@ export function ConfirmClient({
 
       {token && (
         <div className="space-y-3">
-          <p className="text-sm text-emerald-400">
+          <p className="font-mono text-sm text-neon">
             Signed, sealed, and delivered to your agent. The capability below
             contains no readable payment signature. You can close this page.
           </p>
           {returnTo && handoffStored && (
             <a
               href={returnTo}
-              className="block w-full rounded bg-emerald-500 px-6 py-3 text-center font-semibold text-black transition-colors hover:bg-emerald-400"
+              className="block w-full bg-neon px-6 py-3 text-center font-mono text-sm font-medium uppercase tracking-[0.14em] text-void transition-colors hover:bg-ink hover:text-neon"
             >
               Continue to the Mint Gate result →
             </a>
           )}
-          <div className="rounded border border-neutral-800 bg-neutral-900 p-3">
-            <p className="mb-2 text-xs uppercase tracking-wider text-neutral-500">
+          <div className="border border-rule bg-ink/[0.03] p-4">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
               Sealed confirmation capability
             </p>
-            <p className="break-all font-mono text-xs text-neutral-300">
+            <p className="break-all font-mono text-xs text-ink/80">
               {token}
             </p>
           </div>
           <button
             onClick={copyToken}
-            className="w-full rounded bg-neutral-800 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700"
+            className="w-full border border-rule px-6 py-2.5 font-mono text-xs font-medium uppercase tracking-[0.14em] text-ink transition-colors hover:border-neon hover:text-neon"
           >
             {copied ? "Copied" : "Copy sealed capability"}
           </button>
-          <p className="mt-4 text-xs text-neutral-500">
+          <p className="mt-4 font-mono text-xs leading-relaxed text-muted">
             Ask your agent to call <code>execute_purchase</code> with this token,
             merchant &quot;{merchant}&quot;, and amount SGD {amount}.
           </p>
         </div>
       )}
 
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-2 font-mono text-sm text-seal">{error}</p>}
     </div>
   );
 }
