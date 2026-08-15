@@ -6,7 +6,17 @@
 //
 // In-memory, same pattern as src/lib/confirmations.ts and src/lib/receipts.ts.
 
-export type StoreOrderStatus = "awaiting_signature" | "settled" | "refused";
+// "refused" = a signed Block Receipt (AgentPay's own Binding refused the
+// mint - the S2 injection-block case). "rail_failed" = StraitsX declined
+// settlement with no Block Receipt at all (e.g. insufficient sandbox
+// balance - the S3 over-limit case). Keeping these distinct matters: they
+// are attributed to different layers (SIG-018) and the UI must not show a
+// rail failure as if it were AgentPay's own refusal.
+export type StoreOrderStatus =
+  | "awaiting_signature"
+  | "settled"
+  | "refused"
+  | "rail_failed";
 
 export type StoreOrder = {
   requestId: string;
@@ -16,6 +26,8 @@ export type StoreOrder = {
   createdAt: string;
   status: StoreOrderStatus;
   receiptId?: string;
+  /** Only set for rail_failed - there is no receipt object to look up. */
+  detail?: string;
 };
 
 const store = ((globalThis as Record<string, unknown>)
@@ -45,12 +57,17 @@ export function getOrder(requestId: string): StoreOrder | undefined {
 
 export function markOrderResolved(
   requestId: string,
-  status: "settled" | "refused",
-  receiptId: string,
+  outcome:
+    | { status: "settled" | "refused"; receiptId: string }
+    | { status: "rail_failed"; detail: string },
 ): StoreOrder | undefined {
   const order = store.get(requestId);
   if (!order) return undefined;
-  order.status = status;
-  order.receiptId = receiptId;
+  order.status = outcome.status;
+  if (outcome.status === "rail_failed") {
+    order.detail = outcome.detail;
+  } else {
+    order.receiptId = outcome.receiptId;
+  }
   return order;
 }
