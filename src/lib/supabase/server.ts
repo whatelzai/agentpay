@@ -21,21 +21,72 @@ export function supabaseAdmin(): SupabaseClient {
 }
 
 export type KpiSnapshotRow = {
-  unauthorized_spends: number;
-  attacks_blocked: number;
-  authorized_count: number;
-  completed_count: number;
-  median_sign_time_ms: number | null;
+  unauthorized_spends: number | string;
+  attacks_blocked: number | string;
+  authorized_count: number | string;
+  completed_count: number | string;
+  median_sign_time_ms: number | string | null;
 };
 
 export type KpiSnapshot = {
   unauthorized_spends: number;
   attacks_blocked: number;
+  authorized_count: number;
+  completed_count: number;
+  observed_attempts: number;
   intent_fidelity_pct: number | null;
   median_sign_time_ms: number | null;
   window_days: number;
   as_of: string;
 };
+
+function nonNegativeNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+export function normalizeKpiSnapshot(
+  row: KpiSnapshotRow | undefined,
+  windowDays: number,
+  asOf = new Date().toISOString(),
+): KpiSnapshot | null {
+  if (!row) return null;
+
+  const unauthorized = nonNegativeNumber(row.unauthorized_spends);
+  const refused = nonNegativeNumber(row.attacks_blocked);
+  const authorized = nonNegativeNumber(row.authorized_count);
+  const completed = nonNegativeNumber(row.completed_count);
+  if (
+    unauthorized == null ||
+    refused == null ||
+    authorized == null ||
+    completed == null
+  ) {
+    return null;
+  }
+
+  const classifiedDecisions = unauthorized + refused + authorized;
+  if (completed < classifiedDecisions) return null;
+
+  const medianSignTime =
+    row.median_sign_time_ms == null
+      ? null
+      : nonNegativeNumber(row.median_sign_time_ms);
+  const executedOutcomes = authorized + unauthorized;
+
+  return {
+    unauthorized_spends: unauthorized,
+    attacks_blocked: refused,
+    authorized_count: authorized,
+    completed_count: completed,
+    observed_attempts: completed,
+    intent_fidelity_pct:
+      executedOutcomes > 0 ? (authorized / executedOutcomes) * 100 : null,
+    median_sign_time_ms: medianSignTime,
+    window_days: windowDays,
+    as_of: asOf,
+  };
+}
 
 // Fetches the current KPI snapshot for the homepage + /monitor. Returns null
 // on any error so pages can render a degraded ("—") state instead of crashing.
@@ -51,28 +102,7 @@ export async function fetchKpiSnapshot(
     const row = (Array.isArray(data) ? data[0] : data) as
       | KpiSnapshotRow
       | undefined;
-    if (!row) {
-      return {
-        unauthorized_spends: 0,
-        attacks_blocked: 0,
-        intent_fidelity_pct: null,
-        median_sign_time_ms: null,
-        window_days: windowDays,
-        as_of: new Date().toISOString(),
-      };
-    }
-    const authorized = Number(row.authorized_count ?? 0);
-    const completed = Number(row.completed_count ?? 0);
-    return {
-      unauthorized_spends: Number(row.unauthorized_spends ?? 0),
-      attacks_blocked: Number(row.attacks_blocked ?? 0),
-      intent_fidelity_pct:
-        completed > 0 ? (authorized / completed) * 100 : null,
-      median_sign_time_ms:
-        row.median_sign_time_ms != null ? Number(row.median_sign_time_ms) : null,
-      window_days: windowDays,
-      as_of: new Date().toISOString(),
-    };
+    return normalizeKpiSnapshot(row, windowDays);
   } catch {
     return null;
   }

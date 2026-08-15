@@ -3,6 +3,7 @@ import { HeroConnect } from "./_components/HeroConnect";
 import { FeedbackForm } from "./_components/FeedbackForm";
 import { BlocksTable } from "./_components/BlocksTable";
 import { buildKpiRects, KpiRects } from "./_components/KpiRects";
+import { getMonitorEnvironment } from "@/src/lib/monitor";
 import { fetchKpiSnapshot } from "@/src/lib/supabase/server";
 import { fetchRecentBlocks } from "@/src/lib/telemetry";
 
@@ -43,6 +44,7 @@ export default async function Home() {
     fetchRecentBlocks(5),
   ]);
   const cards = buildKpiRects(kpi);
+  const environment = getMonitorEnvironment();
 
   return (
     <main className="bg-void text-ink">
@@ -96,7 +98,12 @@ export default async function Home() {
           The numbers we hold ourselves to.
         </h2>
         <p className="text-sm text-muted mb-16 max-w-xl font-mono">
-          Rolling {kpi?.window_days ?? 30}-day window. Full breakdown at{" "}
+          Rolling {kpi?.window_days ?? 30}-day window. {kpi ? (
+            <>{kpi.observed_attempts.toLocaleString("en-US")} decisions observed. </>
+          ) : (
+            <>Telemetry unavailable; no metric is assumed green. </>
+          )}
+          Full breakdown at{" "}
           <Link
             href="/monitor"
             className="text-neon hover:underline underline-offset-4"
@@ -115,10 +122,13 @@ export default async function Home() {
           What the binding just refused.
         </h2>
         <p className="text-sm text-muted mb-14 max-w-2xl font-mono leading-relaxed">
-          Every refusal is a real row from the sandbox. Neon marks the field
-          the agent tried to change after the human signed.
+          {environment.label} refusal telemetry. Neon marks a signed tuple
+          mismatch; operational failures are labelled separately.
         </p>
-        <BlocksTable blocks={blocks ?? []} />
+        <BlocksTable
+          blocks={blocks}
+          revealPurchaseDetails={environment.revealPurchaseDetails}
+        />
       </section>
 
       {/* Section 4 — Feedback */}
