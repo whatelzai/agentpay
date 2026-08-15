@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoreProduct, formatSgd, STORE_PRODUCTS } from "@/src/lib/store/products";
 import { RevealPayload } from "./RevealPayload";
+import { CheckoutButton } from "./CheckoutButton";
 
 type Params = Promise<{ slug: string }>;
 
@@ -42,14 +43,7 @@ export default async function ProductPage({ params }: { params: Params }) {
           <RevealPayload payload={product.hiddenPayload} />
         ) : null}
 
-        <button
-          type="button"
-          disabled
-          className="inline-flex items-center rounded-full bg-[#432b21] text-white text-base font-semibold px-6 py-3.5 opacity-60 cursor-not-allowed"
-          title="Checkout wiring lands in a follow-up PR"
-        >
-          Buy for {formatSgd(product.priceSgd)} →
-        </button>
+        <CheckoutButton slug={product.slug} priceSgd={product.priceSgd} />
 
         {product.tag ? (
           <p className="text-xs text-[#8c592e] mt-4">{product.tag}</p>
