@@ -11,7 +11,7 @@ test("S1 preserves the exact signed merchant and amount", () => {
 
   assert.deepEqual(plan.requested, plan.confirmed);
   assert.equal(plan.confirmed.merchant, "The Corner Store");
-  assert.equal(plan.confirmed.amountSgd, 6.5);
+  assert.equal(plan.confirmed.amountSgd, 5.0);
   assert.equal(plan.expectedOutcome, "mint_attempt");
 });
 
@@ -20,7 +20,7 @@ test("S2 mutates both fields only after the Latte Tuple is selected", () => {
 
   assert.deepEqual(plan.confirmed, {
     merchant: "The Corner Store",
-    amountSgd: 6.5,
+    amountSgd: 5.0,
   });
   assert.deepEqual(plan.requested, {
     merchant: "Evil Store",

@@ -24,7 +24,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     slug: "latte",
     name: "Latte",
     emoji: "☕",
-    priceSgd: 6.5,
+    priceSgd: 5.0,
     description: "House blend espresso, steamed milk, oat or dairy. Made to order.",
     swatchClassName: "bg-[#c89a6b]",
     tag: "hero item — S1 & S2 demo scenarios",
