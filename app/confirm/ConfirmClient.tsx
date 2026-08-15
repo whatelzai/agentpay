@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createWalletClient, custom, type WalletClient } from "viem";
 import { avalanche, avalancheFuji } from "viem/chains";
 import {
@@ -69,6 +69,16 @@ export function ConfirmClient({
   const [busy, setBusy] = useState(false);
 
   const chain = chainId === 43114 ? avalanche : avalancheFuji;
+
+  useEffect(() => {
+    if (!requestId) return;
+    void fetch(`/api/confirmations/${requestId}/opened`, {
+      method: "POST",
+      keepalive: true,
+    }).catch(() => {
+      /* fire-and-forget telemetry */
+    });
+  }, [requestId]);
 
   async function connect() {
     setError(null);
