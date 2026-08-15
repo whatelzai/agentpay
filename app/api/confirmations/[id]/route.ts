@@ -3,6 +3,7 @@ import {
   getConfirmation,
   isRequestId,
 } from "@/src/lib/confirmations";
+import { recordConfirmationSigned } from "@/src/lib/telemetry";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,9 @@ export async function POST(
       stored: false,
       confirmation_token: getConfirmation(id),
     });
+  }
+  if (result === "stored") {
+    recordConfirmationSigned(id);
   }
   if (result === "unavailable") {
     return Response.json(
