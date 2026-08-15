@@ -29,12 +29,18 @@ function loadEnvKey(): `0x${string}` {
   try {
     raw = readFileSync(new globalThis.URL("../.env", import.meta.url), "utf8");
   } catch {
-    console.error("No .env file found. Copy .env.example to .env and set WALLET_PRIVATE_KEY.");
+    console.error(
+      "No .env file found. Create .env and set STRAITSX_PAYER_PRIVATE_KEY.",
+    );
     process.exit(1);
   }
-  const m = raw.match(/^WALLET_PRIVATE_KEY=(0x[0-9a-fA-F]{64})\s*$/m);
+  const m = raw.match(
+    /^(?:STRAITSX_PAYER_PRIVATE_KEY|WALLET_PRIVATE_KEY)=(0x[0-9a-fA-F]{64})\s*$/m,
+  );
   if (!m) {
-    console.error(".env found but WALLET_PRIVATE_KEY is missing or malformed (need 0x + 64 hex).");
+    console.error(
+      ".env found but STRAITSX_PAYER_PRIVATE_KEY is missing or malformed (need 0x + 64 hex).",
+    );
     process.exit(1);
   }
   return m[1] as `0x${string}`;

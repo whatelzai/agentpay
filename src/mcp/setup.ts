@@ -18,9 +18,9 @@ export const AGENTPAY_INSTRUCTIONS = `AgentPay is the trust layer for AI-agent p
 
 Flow:
 1. Agent calls propose_purchase({merchant, amount_sgd}) → returns a URL for the user to open and sign, plus a request_id.
-2. User signs the (merchant, amount, expiry, nonce) tuple in the browser via EIP-712 typed data — the signed confirmation_token is delivered back to AgentPay automatically.
-3. Agent polls get_confirmation({request_id}) until the token arrives (fallback: the user pastes the token into the chat).
-4. Agent calls execute_purchase(confirmation_token, merchant, amount) — AgentPay decodes the token, recovers the signer, verifies expiry, owner, and nonce freshness, and asserts (merchant, amount) in the mint request match the signed values. Mismatch → refuses with a visible diff and a signed Block Receipt. Match → mints a scoped card on the StraitsX rail; get_receipt returns the proof chain.
+2. In user_wallet mode, the user signs an exact XSGD payment authorization and an AgentPay Confirmation that binds request, merchant, amount, expiry, payer, rail, and payment hash. In platform_wallet demo mode, only the configured owner may confirm.
+3. AgentPay seals the signed payload so the agent never receives the reusable rail signature. The agent polls get_confirmation({request_id}) for the opaque capability.
+4. Agent calls execute_purchase(confirmation_token, merchant, amount) — AgentPay opens the capability and verifies the signer, funding model, payer, payment proof, payment hash, expiry, nonce freshness, and exact Tuple match. Mismatch → refuses with a visible diff and a signed Block Receipt. Match → mints a scoped card on the configured rail; get_receipt returns the proof chain.
 
 Result: even if the agent's context is prompt-injected between confirmation and mint (from a web page, another agent, a tool response, or corrupted memory), the money can only move where the human signed.
 
@@ -36,7 +36,7 @@ export const AGENTPAY_TOOLS = [
   {
     name: "propose_purchase",
     description:
-      "Propose a purchase for user confirmation. Returns a URL for the user to open and sign via EIP-712. After signing, the user gets a base64 confirmation_token to hand back — pass it to execute_purchase to actually mint the card.",
+      "Propose a purchase for user confirmation. Returns a URL for the user to open and sign via EIP-712. In user_wallet mode, the user's own wallet supplies the exact payment authorization; AgentPay never receives its private key. Pass the returned confirmation_token to execute_purchase.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -61,14 +61,14 @@ export const AGENTPAY_TOOLS = [
   {
     name: "execute_purchase",
     description:
-      "Execute a confirmed purchase: mint a scoped virtual card against a signed confirmation_token. Decodes the token, recovers the signer, verifies expiry and owner, refuses replayed tokens, and asserts the (merchant, amount_sgd) in the mint request match the signed values. Mismatch → refuses the mint with a visible diff and a logged Block Receipt. On success returns {authorized, amount_sgd, settlement_tx, snowtrace_url} — card credentials are never returned to the agent; the human views the card separately. This is the prompt-injection defence layer: even if the agent's context was hijacked between signature and mint, the money can only move where the human cryptographically signed.",
+      "Execute a confirmed purchase. Verifies the EIP-712 Confirmation, request-bound payer and rail, linked payment-authorization hash, expiry, replay nonce, and exact merchant/amount Binding. User-funded deployments require the payment signature from the same wallet; platform-funded demo deployments require the fixed configured owner. Any divergence refuses with a Block Receipt. Card credentials are never returned to the agent.",
     inputSchema: {
       type: "object" as const,
       properties: {
         confirmation_token: {
           type: "string",
           description:
-            "Base64-encoded confirmation token from the /confirm page (contains the EIP-712 signature + signed message).",
+            "Opaque AgentPay-sealed confirmation capability. It does not expose the underlying payment signature to the agent.",
         },
         merchant: {
           type: "string",

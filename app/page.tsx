@@ -138,8 +138,8 @@ agentpay ping
 # propose a purchase — get a signed confirmation URL
 agentpay propose -m "Starbucks" -a 5.50
 
-# after signing, execute the purchase against the token
-agentpay execute -t <base64-token> -m "Starbucks" -a 5.50`}
+# after signing, execute with the sealed capability
+agentpay execute -t <sealed-capability> -m "Starbucks" -a 5.50`}
               </pre>
               <p className="text-sm text-neutral-500 mt-3">
                 Or one-shot without install:{" "}

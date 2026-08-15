@@ -54,8 +54,8 @@ program
     "Execute a confirmed purchase against a signed confirmation_token. Verifies signature + (merchant, amount) match. Prompt-injection defence in action.",
   )
   .requiredOption(
-    "-t, --token <base64>",
-    "Base64 confirmation token from /confirm page",
+    "-t, --token <capability>",
+    "Opaque confirmation capability from AgentPay",
   )
   .requiredOption(
     "-m, --merchant <name>",

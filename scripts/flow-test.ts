@@ -9,29 +9,48 @@
  */
 import { recoverTypedDataAddress } from "viem";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
-import { AGENTPAY_DOMAIN, CONFIRMATION_TYPES } from "../src/lib/binding/schema";
+import {
+  agentPayDomain,
+  CONFIRMATION_TYPES,
+  LEGACY_AGENTPAY_DOMAIN,
+  LEGACY_CONFIRMATION_TYPES,
+} from "../src/lib/binding/schema";
 import { encodeToken } from "../src/lib/binding/verify";
 import { executePurchase } from "../src/lib/mcp/tools/execute_purchase";
 import { getReceiptTool } from "../src/lib/mcp/tools/get_receipt";
 import { proposePurchase } from "../src/lib/mcp/tools/propose_purchase";
 import { getConfirmationTool } from "../src/lib/mcp/tools/get_confirmation";
-import { putConfirmation } from "../src/lib/confirmations";
+import {
+  getConfirmation,
+  putConfirmation,
+} from "../src/lib/confirmations";
 import {
   listReceipts,
   BLOCK_RECEIPT_DOMAIN,
   BLOCK_RECEIPT_TYPES,
   type BlockReceipt,
 } from "../src/lib/receipts";
+import {
+  paymentAuthorizationHash,
+  transferAuthorizationTypedData,
+} from "../src/lib/payments/eip3009";
+import { prepareCardMint } from "../src/lib/straitsx/client";
+import { sealConfirmationToken } from "../src/lib/signing/confirmation_seal";
 
 // ── test wallets (throwaway, generated per run) ────────────────────────────
 const ownerAccount = privateKeyToAccount(generatePrivateKey());
 const serverKey = generatePrivateKey();
-const serverAccount = privateKeyToAccount(serverKey);
+const receiptKey = generatePrivateKey();
+const receiptAccount = privateKeyToAccount(receiptKey);
 const strangerAccount = privateKeyToAccount(generatePrivateKey());
+const confirmationSealingKey = generatePrivateKey();
 
-process.env.OWNER_ADDRESS = ownerAccount.address;
-process.env.WALLET_PRIVATE_KEY = serverKey;
+process.env.AGENTPAY_FUNDING_MODE = "platform_wallet";
+process.env.DEMO_OWNER_ADDRESS = ownerAccount.address;
+process.env.STRAITSX_PAYER_PRIVATE_KEY = serverKey;
+process.env.RECEIPT_SIGNER_PRIVATE_KEY = receiptKey;
 process.env.STRAITSX_ENV = "production";
+process.env.CONFIRMATION_SEALING_KEY = confirmationSealingKey;
 
 // ── fake credential material the agent must NEVER see ──────────────────────
 const FAKE_PAN = "4665 1711 2233 5538";
@@ -128,16 +147,74 @@ async function makeToken(opts: {
     nonce,
   };
   const signature = await account.signTypedData({
-    domain: AGENTPAY_DOMAIN,
-    types: CONFIRMATION_TYPES,
+    domain: LEGACY_AGENTPAY_DOMAIN,
+    types: LEGACY_CONFIRMATION_TYPES,
     primaryType: "Confirmation",
     message,
   });
   return encodeToken({
+    version: 1,
     ...message,
     signature,
     signer: account.address,
   });
+}
+
+async function makeUserToken(opts: {
+  merchant: string;
+  amountCents: bigint;
+  requestId?: string;
+  account?: typeof ownerAccount;
+}) {
+  const account = opts.account ?? ownerAccount;
+  const requestId =
+    opts.requestId ?? `req_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+  const prepared = await prepareCardMint({
+    amountCents: opts.amountCents,
+    cardholderName: "AgentPay User",
+    environment: "production",
+    payerAddress: account.address,
+  });
+  if (!prepared.ok) throw new Error(prepared.reason);
+
+  const paymentSignature = await account.signTypedData(
+    transferAuthorizationTypedData(prepared.intent),
+  );
+  const message = {
+    requestId,
+    merchant: opts.merchant,
+    amountSgd: opts.amountCents,
+    expiryTimestamp: BigInt(
+      Math.min(
+        Math.floor(Date.now() / 1000) + 300,
+        Number(prepared.intent.authorization.validBefore),
+      ),
+    ),
+    nonce: generatePrivateKey(),
+    paymentRail: "straitsx" as const,
+    payer: account.address,
+    paymentAuthorizationHash: paymentAuthorizationHash(prepared.intent),
+  };
+  const signature = await account.signTypedData({
+    domain: agentPayDomain(43114),
+    types: CONFIRMATION_TYPES,
+    primaryType: "Confirmation",
+    message,
+  });
+  const decoded = {
+    version: 2 as const,
+    chainId: 43114 as const,
+    ...message,
+    signature,
+    signer: account.address,
+    paymentProof: { intent: prepared.intent, signature: paymentSignature },
+  };
+  const rawToken = encodeToken(decoded);
+  return {
+    token: sealConfirmationToken(rawToken),
+    rawToken,
+    decoded,
+  };
 }
 
 const ctx = { mode: "stdio" as const };
@@ -223,7 +300,7 @@ async function main() {
       amount_sgd: 6.5,
     });
     check("refused", result.isError === true);
-    check("names the owner rule", text.includes("registered owner"));
+    check("names the owner rule", text.includes("platform wallet owner"));
   }
 
   console.log("S6 — expired confirmation");
@@ -330,8 +407,8 @@ async function main() {
           signature: refusal.signature,
         });
         check(
-          "signature recovers to the server wallet",
-          recovered.toLowerCase() === serverAccount.address.toLowerCase(),
+          "signature recovers to the independent receipt signer",
+          recovered.toLowerCase() === receiptAccount.address.toLowerCase(),
         );
       }
     }
@@ -394,11 +471,211 @@ async function main() {
       .map((c) => (c.type === "text" ? c.text : ""))
       .join("\n");
     allResults.push(confirmedText);
-    check("poll returns the token", confirmedText.includes(token));
+    const capability = getConfirmation(rid!);
+    check("stored value is a sealed capability", capability?.startsWith("apc1.") === true);
+    check("poll returns the capability", Boolean(capability && confirmedText.includes(capability)));
+    check("poll never returns the signed payload", !confirmedText.includes(token));
     check("poll points at execute_purchase", confirmedText.includes("execute_purchase"));
   }
 
   console.log("S12 — REDACTION SWEEP: no credential material in any agent-visible output");
+  {
+    const everything = JSON.stringify(allResults) + JSON.stringify(listReceipts());
+    check("no card_html", !everything.includes("card_html"));
+    check("no PAN", !everything.includes(FAKE_PAN) && !everything.includes("4665"));
+    check("no card_opaque_id", !everything.includes(FAKE_OPAQUE_ID));
+    check("no iframe/jwt", !everything.includes("FAKEJWT") && !everything.includes(FAKE_IFRAME));
+  }
+
+  process.env.AGENTPAY_FUNDING_MODE = "user_wallet";
+  delete process.env.DEMO_OWNER_ADDRESS;
+  delete process.env.STRAITSX_PAYER_PRIVATE_KEY;
+
+  console.log("S13 — user-funded flow needs no platform payer key");
+  {
+    const prepared = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+    });
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: prepared.token,
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    check("authorized from the user wallet", !result.isError, text);
+    check(
+      "uses the signed proof without a server-side signing call",
+      fetchCalls.length === 1 && fetchCalls[0].paid,
+    );
+    check("reports user_wallet funding", text.includes('"funding_mode": "user_wallet"'));
+    check("reports the dynamic payer", text.includes(ownerAccount.address));
+    check("agent receives only an opaque capability", prepared.token.startsWith("apc1."));
+  }
+
+  console.log("S14 — a second user can fund their own independent purchase");
+  {
+    const prepared = await makeUserToken({
+      merchant: "Cafe",
+      amountCents: 700n,
+      account: strangerAccount,
+    });
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: prepared.token,
+      merchant: "Cafe",
+      amount_sgd: 7,
+    });
+    check("second user authorized", !result.isError, text);
+    check("second user is the payer", text.includes(strangerAccount.address));
+    check("one paid rail call", fetchCalls.length === 1 && fetchCalls[0].paid);
+  }
+
+  console.log("S15 — invalid user payment signature is blocked before the rail");
+  {
+    const prepared = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+    });
+    prepared.decoded.paymentProof.signature = "0x00";
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: sealConfirmationToken(encodeToken(prepared.decoded)),
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    check("refused", result.isError === true);
+    check("names payment authorization", text.includes("payment authorization failed"));
+    check("no rail call", fetchCalls.length === 0);
+  }
+
+  console.log("S16 — a valid but replaced payment proof is blocked by the hash Binding");
+  {
+    const original = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+    });
+    const replacement = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+    });
+    original.decoded.paymentProof = replacement.decoded.paymentProof;
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: sealConfirmationToken(encodeToken(original.decoded)),
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    check("refused", result.isError === true);
+    check("names replacement", text.includes("replaced after confirmation"));
+    check("no rail call", fetchCalls.length === 0);
+  }
+
+  console.log("S17 — a version 2 token cannot move to a different request id");
+  {
+    const signedRequest = "req_1111111111111111";
+    const otherRequest = "req_2222222222222222";
+    const prepared = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+      requestId: signedRequest,
+    });
+    check(
+      "cross-request hand-off refused",
+      putConfirmation(otherRequest, prepared.rawToken) === "invalid",
+    );
+    check(
+      "matching request hand-off stored",
+      putConfirmation(signedRequest, prepared.rawToken) === "stored",
+    );
+  }
+
+  console.log("S18 — legacy tokens cannot spend through user_wallet mode");
+  {
+    const legacy = await makeToken({ merchant: "Book Store", amountCents: 650n });
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: legacy,
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    check("refused", result.isError === true);
+    check("requires user payment authorization", text.includes("no user payment authorization"));
+    check("no rail call", fetchCalls.length === 0);
+  }
+
+  console.log("S19 — raw user-wallet payload is never accepted from an agent");
+  {
+    const prepared = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+    });
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: prepared.rawToken,
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    check("refused", result.isError === true);
+    check("requires an AgentPay seal", text.includes("must be AgentPay-sealed"));
+    check("no rail call", fetchCalls.length === 0);
+  }
+
+  console.log("S20 — malformed nested payment proof fails closed");
+  {
+    const prepared = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+    });
+    prepared.decoded.paymentProof.intent.authorization = null as never;
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: sealConfirmationToken(encodeToken(prepared.decoded)),
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    check("refused without throwing", result.isError === true);
+    check("names malformed authorization", text.includes("malformed authorization"));
+    check("no rail call", fetchCalls.length === 0);
+  }
+
+  console.log("S21 — execution never rounds a sub-cent amount");
+  {
+    const prepared = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+    });
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: prepared.token,
+      merchant: "Book Store",
+      amount_sgd: 6.501,
+    });
+    check("refused", result.isError === true);
+    check("states that execution is never rounded", text.includes("never rounds"));
+    check("no rail call", fetchCalls.length === 0);
+  }
+
+  console.log("S22 — tampered sealed capability fails authentication");
+  {
+    const prepared = await makeUserToken({
+      merchant: "Book Store",
+      amountCents: 650n,
+    });
+    const replacement = prepared.token.endsWith("A") ? "B" : "A";
+    const tampered = prepared.token.slice(0, -1) + replacement;
+    fetchCalls = [];
+    const { result, text } = await run({
+      confirmation_token: tampered,
+      merchant: "Book Store",
+      amount_sgd: 6.5,
+    });
+    check("refused", result.isError === true);
+    check("cannot be opened", text.includes("could not be opened"));
+    check("no rail call", fetchCalls.length === 0);
+  }
+
+  console.log("S23 — final credential-redaction sweep");
   {
     const everything = JSON.stringify(allResults) + JSON.stringify(listReceipts());
     check("no card_html", !everything.includes("card_html"));
