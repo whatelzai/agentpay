@@ -24,7 +24,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AgentPay — Every AI purchase matches what you signed",
+  title: "AgentPay — Say bye to prompt injections",
   description:
     "Cryptographic confirmation binding for AI-agent payments. Cards handle credential theft. AgentPay handles the rest.",
 };
