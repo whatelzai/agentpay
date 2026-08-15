@@ -15,6 +15,7 @@ export async function listProducts(_ctx: ToolContext): Promise<CallToolResult> {
     catalog_url: `${baseUrl}/store`,
     products: STORE_PRODUCTS.map((p) => ({
       slug: p.slug,
+      category: p.category,
       url: `${baseUrl}/store/${p.slug}`,
     })),
     protocol: [
