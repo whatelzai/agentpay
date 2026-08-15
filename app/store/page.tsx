@@ -34,14 +34,14 @@ export default function StorePage() {
 
         <section className="mb-12">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8c592e]">
-            The three-act safety demo
+            The two-act safety demo
           </p>
           <h2 className="mt-2 max-w-3xl text-2xl font-bold tracking-tight md:text-3xl">
-            One protocol. Three outcomes. Every blocker gets the right credit.
+            One protocol. Two outcomes. The binding gets the credit either way.
           </h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
             <Link
-              href="/store/latte#s1"
+              href="/store/latte-1#s1"
               className="rounded-xl border border-[#bcd6a8] bg-[#eef6e6] p-5 transition-transform hover:-translate-y-1"
             >
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#3e6b2a]">
@@ -53,7 +53,7 @@ export default function StorePage() {
               </p>
             </Link>
             <Link
-              href="/store/latte#s2"
+              href="/store/latte-2#s2"
               className="rounded-xl border border-[#e3a3a3] bg-[#fdecec] p-5 transition-transform hover:-translate-y-1"
             >
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#b32a2a]">
@@ -62,18 +62,6 @@ export default function StorePage() {
               <p className="mt-2 font-semibold">AgentPay refuses</p>
               <p className="mt-1 text-sm text-[#432b21]/65">
                 The agent mutates merchant and amount after signing.
-              </p>
-            </Link>
-            <Link
-              href="/store/weekly-grocery-bundle#s3"
-              className="rounded-xl border border-[#e8c98a] bg-[#fdf3e0] p-5 transition-transform hover:-translate-y-1"
-            >
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#8a5a1a]">
-                S3 / Rail decision
-              </p>
-              <p className="mt-2 font-semibold">StraitsX decides</p>
-              <p className="mt-1 text-sm text-[#432b21]/65">
-                Intent matches. Sandbox funding and rail rules decide settlement.
               </p>
             </Link>
           </div>

@@ -20,7 +20,7 @@ When making architectural or scope decisions, refer to (and update) the vault. D
 
 - Next.js 16 (App Router), React 19, TypeScript 5 (strict)
 - Tailwind CSS v4 (PostCSS-based, no `tailwind.config.js`)
-- npm, Node >= 20
+- npm, Node >= 22 (Turbopack in Next 16 requires 22+)
 - `@modelcontextprotocol/sdk` v1 (phase 2)
 - `commander` v12 (phase 3)
 
