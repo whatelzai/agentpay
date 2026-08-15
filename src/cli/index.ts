@@ -30,6 +30,17 @@ program
   });
 
 program
+  .command("fetch-product")
+  .description(
+    "Fetch a single product page from the demo catalog. Returns canonical price, merchant, and raw page content (untrusted).",
+  )
+  .requiredOption("-s, --slug <slug>", "Product slug (e.g. latte-1)")
+  .option("-e, --endpoint <url>", "MCP endpoint URL", DEFAULT_ENDPOINT)
+  .action(async (opts: { slug: string; endpoint: string }) => {
+    await callTool(opts.endpoint, "fetch_product", { slug: opts.slug });
+  });
+
+program
   .command("propose")
   .description(
     "Propose a purchase — prints a confirmation URL for the user to open and sign.",
