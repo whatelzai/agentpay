@@ -54,11 +54,19 @@ NEXT_PUBLIC_BASE_URL=https://agentpay-tan.vercel.app
 AGENTPAY_PAYMENT_RAIL=straitsx
 AGENTPAY_FUNDING_MODE=user_wallet
 STRAITSX_ENV=sandbox
+AGENTPAY_DEMO_MODE=true
 CONFIRMATION_SEALING_KEY=<output of openssl rand -hex 32>
 ```
 
 Do not set `OWNER_ADDRESS`, `WALLET_PRIVATE_KEY`, or
 `STRAITSX_PAYER_PRIVATE_KEY` in `user_wallet` mode.
+
+`AGENTPAY_DEMO_MODE=true` enables the browser S1/S2/S3 arena only while
+`STRAITSX_ENV=sandbox`. The endpoint fails closed outside sandbox. For a
+cryptographically signed Block Receipt in the hackathon demo, configure a
+separate throwaway `RECEIPT_SIGNER_PRIVATE_KEY`; it never funds a payment.
+Supabase remains observability-only: it stores usage and KPI evidence, never
+confirmation capabilities, payment proofs, card credentials, or spend authority.
 
 ## Scripts
 

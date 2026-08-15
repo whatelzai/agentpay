@@ -322,6 +322,9 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
+    const receiptProof = receipt.signature
+      ? "cryptographically signed record of this refusal"
+      : "logged in unsigned sandbox demo mode";
     await record(correlationId, "refused_mismatch", "tuple_diverged", requested, {
       signerAddress: verification.recoveredAddress,
       confirmed,
@@ -333,7 +336,7 @@ Block Receipt ${receipt.id} logged.`,
         ...diff,
         "",
         `Signer: ${verification.recoveredAddress}`,
-        `Block Receipt ${receipt.id} — signed record of this refusal logged.`,
+        `Block Receipt ${receipt.id} — ${receiptProof}.`,
         "",
         "This is prompt-injection defence in action. The user cryptographically signed one purchase; the agent asked for a different one. AgentPay refuses to mint. Money does not move.",
       ].join("\n"),

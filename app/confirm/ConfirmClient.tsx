@@ -17,6 +17,7 @@ import {
 } from "@/src/lib/payments/eip3009";
 import type { FundingMode } from "@/src/lib/payments/adapter";
 import { sgdToCents } from "@/src/lib/payments/amount";
+import { capabilityStorageKey } from "@/src/lib/store/demo_scenarios";
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -67,6 +68,8 @@ export function ConfirmClient({
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [handoffStored, setHandoffStored] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const chain = chainId === 43114 ? avalanche : avalancheFuji;
 
@@ -258,7 +261,18 @@ export function ConfirmClient({
       if (!response.ok || !stored.confirmation_token) {
         throw new Error(stored.error ?? "AgentPay could not seal the confirmation");
       }
-      setToken(stored.confirmation_token);
+      const capability = stored.confirmation_token;
+      setToken(capability);
+      if (returnTo) {
+        try {
+          sessionStorage.setItem(capabilityStorageKey(requestId), capability);
+          setHandoffStored(true);
+        } catch {
+          setError(
+            "Signed successfully, but this browser blocked the same-tab demo handoff. Copy the sealed capability below instead.",
+          );
+        }
+      }
     } catch (caught) {
       setError(`Sign failed: ${(caught as Error).message}`);
     } finally {
@@ -267,7 +281,14 @@ export function ConfirmClient({
   }
 
   async function copyToken() {
-    if (token) await navigator.clipboard.writeText(token);
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setError("Clipboard access was blocked. Select the sealed capability above.");
+    }
   }
 
   return (
@@ -315,12 +336,12 @@ export function ConfirmClient({
             Signed, sealed, and delivered to your agent. The capability below
             contains no readable payment signature. You can close this page.
           </p>
-          {returnTo && (
+          {returnTo && handoffStored && (
             <a
               href={returnTo}
               className="block w-full rounded bg-emerald-500 px-6 py-3 text-center font-semibold text-black transition-colors hover:bg-emerald-400"
             >
-              Continue to order status →
+              Continue to the Mint Gate result →
             </a>
           )}
           <div className="rounded border border-neutral-800 bg-neutral-900 p-3">
@@ -335,7 +356,7 @@ export function ConfirmClient({
             onClick={copyToken}
             className="w-full rounded bg-neutral-800 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700"
           >
-            Copy token to clipboard
+            {copied ? "Copied" : "Copy sealed capability"}
           </button>
           <p className="mt-4 text-xs text-neutral-500">
             Ask your agent to call <code>execute_purchase</code> with this token,

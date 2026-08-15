@@ -8,7 +8,7 @@
 //     (SIG-018: "AgentPay blocks what the user never confirmed").
 //   - Rail-level failure (StraitsX declines the mint, e.g. insufficient
 //     sandbox balance): no receipt at all - just a plain refusal message
-//     (SIG-018: "StraitsX blocks what the user never allowed"). The
+//     (SIG-018: the rail can still decline intent that AgentPay allowed). The
 //     confirmation's nonce may already be consumed here; execute_purchase's
 //     own message tells the human what to do next.
 // The success path always ends with a "receipt: <id>" line.

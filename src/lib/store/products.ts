@@ -46,7 +46,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     priceSgd: 28.0,
     description: "Coffee beans, milk, and snacks — a full week's order.",
     swatchClassName: "bg-[#9eb58c]",
-    tag: "S3 item — priced above the sandbox balance",
+    tag: "S3 item — puts the sandbox rail decision on stage",
   },
 ];
 

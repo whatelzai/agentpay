@@ -29,6 +29,15 @@ export default async function Confirm({
   return (
     <main className="min-h-screen bg-black text-white">
       <div className="max-w-xl mx-auto px-6 py-24">
+        <div className="mb-8 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
+          <span className="rounded-full bg-emerald-500 px-3 py-1.5 text-black">
+            StraitsX Sandbox
+          </span>
+          <span className="rounded-full border border-neutral-700 px-3 py-1.5 text-neutral-300">
+            Avalanche Fuji
+          </span>
+          <span className="text-neutral-500">No real money</span>
+        </div>
         <p className="text-sm font-medium text-emerald-400 mb-4 tracking-wider uppercase">
           Confirmation
         </p>

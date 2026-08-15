@@ -19,7 +19,10 @@ function withCors(response: Response): Response {
 }
 
 async function handleMcp(request: Request): Promise<Response> {
-  const ctx: ToolContext = { mode: "http" };
+  const ctx: ToolContext = {
+    mode: "http",
+    baseUrl: new URL(request.url).origin,
+  };
   const server = buildAgentPayServer(ctx);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
