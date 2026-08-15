@@ -66,7 +66,7 @@ export default async function Home() {
               href="/monitor"
               className="text-muted hover:text-neon transition-colors"
             >
-              Scorecard
+              Scoreboard
             </Link>
             <a
               href="https://github.com/whatelzai/agentpay"
@@ -91,7 +91,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Section 2 — Public scorecard: 3 KPIs side by side */}
+      {/* Section 2 — Public scorecard: 4 KPIs side by side */}
       <section className="max-w-6xl mx-auto px-6 md:px-10 py-28 border-t border-rule">
         <Kicker>Public scorecard</Kicker>
         <h2 className="font-body font-semibold text-3xl md:text-5xl tracking-[-0.03em] mt-6 mb-3">

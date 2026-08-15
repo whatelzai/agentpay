@@ -4,6 +4,10 @@ import { classifyBlockReason } from "../app/_components/BlocksTable";
 import { buildKpiRects } from "../app/_components/KpiRects";
 import { getMonitorEnvironment } from "../src/lib/monitor";
 import {
+  getMonitorMetric,
+  MONITOR_METRICS,
+} from "../src/lib/monitor-metrics";
+import {
   normalizeKpiSnapshot,
   type KpiSnapshot,
 } from "../src/lib/supabase/server";
@@ -57,6 +61,21 @@ test("measured KPI telemetry exposes safety, utility, and sample-aware states", 
       { label: "Median sign", value: "7.0s", status: "on target" },
     ],
   );
+});
+
+test("every KPI card links to one unique calculation contract", () => {
+  const cards = buildKpiRects(measuredSnapshot);
+
+  assert.deepEqual(
+    cards.map(({ slug, href, label }) => ({ slug, href, label })),
+    MONITOR_METRICS.map(({ slug, label }) => ({
+      slug,
+      href: `/monitor/${slug}`,
+      label,
+    })),
+  );
+  assert.equal(new Set(cards.map((card) => card.href)).size, cards.length);
+  assert.equal(getMonitorMetric("does-not-exist"), undefined);
 });
 
 test("an empty measurement window is not presented as proof of safety", () => {
