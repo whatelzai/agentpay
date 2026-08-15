@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "./supabase/server";
 
-// Fire-and-forget telemetry. Every insert is wrapped so a Supabase outage or
-// missing credentials never blocks the payment path — the KPI numbers are
+// Best-effort telemetry. Every insert is wrapped so a Supabase outage or
+// missing credentials never blocks the payment path - the KPI numbers are
 // observability, not part of the safety contract.
 
 export type SpendOutcome =

@@ -26,7 +26,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/monitoring.test.ts",
+    "test": "tsx --test tests/*.test.ts",
     "mcp": "tsx src/mcp/server.ts",
     "cli:dev": "tsx src/cli/index.ts",
     "build:cli": "node scripts/build-cli.mjs",

@@ -9,7 +9,7 @@ import {
 import { confirmationSealingConfigured } from "../../signing/confirmation_seal";
 
 export async function proposePurchase(
-  _ctx: ToolContext,
+  ctx: ToolContext,
   args: Record<string, unknown>,
 ): Promise<CallToolResult> {
   const merchant = typeof args.merchant === "string" ? args.merchant : undefined;
@@ -81,7 +81,9 @@ export async function proposePurchase(
 
   const requestId = `req_${randomBytes(8).toString("hex")}`;
   const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ?? "https://agentpay-tan.vercel.app";
+    process.env.NEXT_PUBLIC_BASE_URL ??
+    ctx.baseUrl ??
+    "https://agentpay-tan.vercel.app";
   const params = new URLSearchParams({
     merchant,
     amount: String(amountSgd),

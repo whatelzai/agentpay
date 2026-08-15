@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 const MCP_URL = "https://agentpay-tan.vercel.app/api/mcp";
 const NPM_INSTALL = "npm i -g @aisystemresources/agentpay";
@@ -41,8 +42,9 @@ export function HeroConnect() {
   }
 
   return (
-    <div className="border border-rule bg-void/60 backdrop-blur-sm">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-rule">
+    <div>
+      <div className="border border-rule bg-void/60 backdrop-blur-sm">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-rule">
         <label
           htmlFor="agent-select"
           className="text-[10px] tracking-[0.18em] uppercase text-muted font-mono"
@@ -70,22 +72,30 @@ export function HeroConnect() {
         <span className="text-xs text-muted ml-auto hidden sm:block font-mono">
           {c.subtitle}
         </span>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3">
+          <span className="text-neon font-mono text-sm select-none">
+            {c.kind === "shell" ? "$" : "↳"}
+          </span>
+          <code className="flex-1 font-mono text-sm text-ink truncate">
+            {c.snippet}
+          </code>
+          <button
+            onClick={copy}
+            className="text-[11px] tracking-[0.18em] uppercase text-muted hover:text-neon transition-colors font-mono"
+            aria-label="Copy to clipboard"
+          >
+            {copied ? "copied" : "copy"}
+          </button>
+        </div>
       </div>
-      <div className="flex items-center gap-3 px-4 py-3">
-        <span className="text-neon font-mono text-sm select-none">
-          {c.kind === "shell" ? "$" : "↳"}
-        </span>
-        <code className="flex-1 font-mono text-sm text-ink truncate">
-          {c.snippet}
-        </code>
-        <button
-          onClick={copy}
-          className="text-[11px] tracking-[0.18em] uppercase text-muted hover:text-neon transition-colors font-mono"
-          aria-label="Copy to clipboard"
-        >
-          {copied ? "copied" : "copy"}
-        </button>
-      </div>
+      <Link
+        href="/store"
+        className="mt-4 flex items-center justify-between border border-neon/40 bg-neon/[0.06] px-4 py-3 text-left font-mono text-xs uppercase tracking-[0.14em] text-neon transition-colors hover:bg-neon/[0.12]"
+      >
+        <span>Run the live StraitsX sandbox safety demo</span>
+        <span aria-hidden="true">-&gt;</span>
+      </Link>
     </div>
   );
 }

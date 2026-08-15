@@ -1,7 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getStoreProduct, STORE_MERCHANT_NAME } from "@/src/lib/store/products";
-import { createOrder } from "@/src/lib/store/orders";
+import {
+  buildDemoExecutionPlan,
+  demoReturnPath,
+  isDemoScenario,
+} from "@/src/lib/store/demo_scenarios";
 import { sgdToCents, isSupportedCardAmount } from "@/src/lib/payments/amount";
 import { confirmationSealingConfigured } from "@/src/lib/signing/confirmation_seal";
 import { configuredPaymentRail } from "@/src/lib/payments/adapter";
@@ -15,7 +19,17 @@ import { STRAITSX_CHAIN_ID, XSGD_ASSET, straitsxEnv } from "@/src/lib/straitsx/c
 const CONFIRM_EXPIRY_SECONDS = 300;
 
 export async function POST(request: Request) {
-  let body: { slug?: unknown };
+  if (
+    process.env.AGENTPAY_DEMO_MODE !== "true" ||
+    straitsxEnv() !== "sandbox"
+  ) {
+    return NextResponse.json(
+      { error: "the browser checkout demo is available only in sandbox demo mode" },
+      { status: 503 },
+    );
+  }
+
+  let body: { slug?: unknown; scenario?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -23,8 +37,13 @@ export async function POST(request: Request) {
   }
   const slug = typeof body.slug === "string" ? body.slug : undefined;
   const product = slug ? getStoreProduct(slug) : undefined;
-  if (!product) {
+  if (!product || !slug || !isDemoScenario(body.scenario)) {
     return NextResponse.json({ error: "unknown product" }, { status: 404 });
+  }
+  try {
+    buildDemoExecutionPlan(slug, body.scenario);
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
 
   if (!confirmationSealingConfigured()) {
@@ -52,22 +71,16 @@ export async function POST(request: Request) {
   }
 
   const requestId = `req_${randomBytes(8).toString("hex")}`;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://agentpay-tan.vercel.app";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? new URL(request.url).origin;
+  const returnTo = demoReturnPath(requestId, slug, body.scenario);
   const confirmParams = new URLSearchParams({
     merchant: STORE_MERCHANT_NAME,
     amount: String(product.priceSgd),
     expiry: String(CONFIRM_EXPIRY_SECONDS),
     rid: requestId,
-    return_to: `/store/order/${requestId}`,
+    return_to: returnTo,
   });
   const confirmUrl = `${baseUrl}/confirm?${confirmParams.toString()}`;
-
-  createOrder({
-    requestId,
-    slug: product.slug,
-    merchant: STORE_MERCHANT_NAME,
-    amountSgd: product.priceSgd,
-  });
 
   const env = straitsxEnv();
   return NextResponse.json(
@@ -87,6 +100,7 @@ export async function POST(request: Request) {
         },
       ],
       request_id: requestId,
+      scenario: body.scenario,
       confirm_url: confirmUrl,
     },
     { status: 402 },

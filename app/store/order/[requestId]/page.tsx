@@ -1,12 +1,32 @@
 import Link from "next/link";
 import { OrderStatus } from "./OrderStatus";
+import {
+  buildDemoExecutionPlan,
+  isDemoScenario,
+} from "@/src/lib/store/demo_scenarios";
 
 type Params = Promise<{ requestId: string }>;
+type SearchParams = Promise<{ slug?: string; scenario?: string }>;
 
 export const metadata = { title: "Order status — The Corner Store" };
 
-export default async function OrderPage({ params }: { params: Params }) {
+export default async function OrderPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { requestId } = await params;
+  const { slug, scenario } = await searchParams;
+  let valid = Boolean(slug && isDemoScenario(scenario));
+  if (valid && slug && isDemoScenario(scenario)) {
+    try {
+      buildDemoExecutionPlan(slug, scenario);
+    } catch {
+      valid = false;
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#faf3e9] text-[#432b21]">
@@ -18,16 +38,14 @@ export default async function OrderPage({ params }: { params: Params }) {
           ← The Corner Store
         </Link>
 
-        {/*
-          Order details (product, amount, confirm link) are fetched
-          client-side by OrderStatus via /api/store/orders/[requestId] -
-          deliberately not looked up here. Vercel can run this page and that
-          API route as separate serverless functions with separate in-memory
-          state, so a server-side getOrder() here can 404 on an order the
-          API route can see just fine. The API route is the single source
-          of truth for order existence.
-        */}
-        <OrderStatus requestId={requestId} />
+        {valid && slug && isDemoScenario(scenario) ? (
+          <OrderStatus requestId={requestId} slug={slug} scenario={scenario} />
+        ) : (
+          <div className="mt-8 rounded-xl border border-[#e3a3a3] bg-[#fdecec] p-5 text-sm">
+            This sandbox result link is incomplete. Start a fresh scenario from
+            the store.
+          </div>
+        )}
       </div>
     </main>
   );
