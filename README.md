@@ -86,19 +86,20 @@ CLI publishes to npm automatically when `package.json .version` bumps on `main`.
 ## Codex plugin
 
 The `agentpay-safe-spend` plugin packages the remote AgentPay MCP together
-with the safe-spend policy and purchase protocol skills. From a clone of this
+with four coordinated skills for untrusted discovery, pre-confirmation policy,
+wallet-bound authorization, and outcome attribution. From a clone of this
 repository:
 
 ```bash
 codex plugin marketplace add .
-codex plugin add agentpay-safe-spend@agentpay-local
+codex plugin add agentpay-safe-spend@agentpay
 ```
 
 For a Git-backed install after this branch reaches `main`:
 
 ```bash
 codex plugin marketplace add whatelzai/agentpay --ref main
-codex plugin add agentpay-safe-spend@agentpay-local
+codex plugin add agentpay-safe-spend@agentpay
 ```
 
 Start a new Codex thread after installation so the MCP tools and skills are

@@ -14,13 +14,13 @@ When making architectural or scope decisions, refer to (and update) the vault. D
 ## Committed decisions (from vault)
 
 - **DEC-001:** SPEND SAFELY is Track 2's north star. Every build item must push toward prompt-injection defense at the payment layer.
-- **DEC-002:** Focus on prompt injection specifically. Three source categories (content-source / peer / persistent-state). Two live demo scenarios (web-page injection + A2A injection). Explicit non-goals: direct user injection, phishing, card-layer compromise.
+- **DEC-002:** Focus on prompt injection specifically. Three source categories (content-source / peer / persistent-state). One live demo scenario (web-page injection). A2A and persistent-state defense remain encoded in the `agentpay-safe-spend` plugin skills but are not demoed live — 1-minute pitch window forces single-scenario focus. Explicit non-goals: direct user injection, phishing, card-layer compromise.
 
 ## Stack
 
 - Next.js 16 (App Router), React 19, TypeScript 5 (strict)
 - Tailwind CSS v4 (PostCSS-based, no `tailwind.config.js`)
-- npm, Node >= 20
+- npm, Node >= 22 (Turbopack in Next 16 requires 22+)
 - `@modelcontextprotocol/sdk` v1 (phase 2)
 - `commander` v12 (phase 3)
 

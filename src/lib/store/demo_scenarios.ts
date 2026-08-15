@@ -55,12 +55,18 @@ export function buildDemoExecutionPlan(
   const product = getStoreProduct(slug);
   if (!product) throw new Error("unknown demo product");
 
-  if (scenario === "web_injection" && slug !== "latte") {
-    throw new Error("the web-injection scenario is only available for Latte");
-  }
-  if (scenario === "rail_limit" && slug !== "weekly-grocery-bundle") {
+  if (scenario === "web_injection" && !product.hiddenPayload) {
     throw new Error(
-      "the rail-limit scenario is only available for the Weekly Grocery Bundle",
+      "the web-injection scenario is only available for products with a hidden content-source payload",
+    );
+  }
+  if (scenario === "rail_limit") {
+    // The rail-limit scenario needs a product priced outside the SGD 5–30
+    // card range. The current latte/juice catalog stays within that range, so
+    // this scenario is not wired to any product yet. Teammates: add a product
+    // priced > SGD 30 and re-target this branch when the scenario is needed.
+    throw new Error(
+      "the rail-limit scenario has no product in the current catalog",
     );
   }
 
@@ -88,8 +94,7 @@ export function buildDemoExecutionPlan(
     product,
     confirmed,
     requested: confirmed,
-    expectedOutcome:
-      scenario === "rail_limit" ? "rail_decision" : "mint_attempt",
+    expectedOutcome: "mint_attempt",
   };
 }
 
