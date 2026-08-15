@@ -7,6 +7,7 @@ type SearchParams = Promise<{
   amount?: string;
   expiry?: string;
   rid?: string;
+  return_to?: string;
 }>;
 
 export default async function Confirm({
@@ -14,11 +15,16 @@ export default async function Confirm({
 }: {
   searchParams: SearchParams;
 }) {
-  const { merchant, amount, expiry, rid } = await searchParams;
+  const { merchant, amount, expiry, rid, return_to } = await searchParams;
   const fundingMode = configuredFundingMode();
   const chainId = STRAITSX_CHAIN_ID[straitsxEnv()] as 43113 | 43114;
   const hasRequiredParams =
     Boolean(merchant && amount && rid);
+  // Only accept a same-origin relative path - never forward an open redirect.
+  const returnTo =
+    return_to && return_to.startsWith("/") && !return_to.startsWith("//")
+      ? return_to
+      : undefined;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -59,6 +65,7 @@ export default async function Confirm({
             requestId={rid}
             fundingMode={fundingMode}
             chainId={chainId}
+            returnTo={returnTo}
           />
         ) : (
           <p className="text-sm text-red-400">

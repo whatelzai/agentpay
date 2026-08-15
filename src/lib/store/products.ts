@@ -1,3 +1,8 @@
+// The merchant name signed into every Confirmation Tuple for this store.
+// One store, one merchant identity - keeps the Binding's (merchant, amount)
+// check meaningful across every product.
+export const STORE_MERCHANT_NAME = "The Corner Store";
+
 export type StoreProduct = {
   slug: string;
   name: string;

@@ -53,6 +53,7 @@ export function ConfirmClient({
   requestId,
   fundingMode,
   chainId,
+  returnTo,
 }: {
   merchant: string;
   amount: string;
@@ -60,6 +61,7 @@ export function ConfirmClient({
   requestId?: string;
   fundingMode: FundingMode;
   chainId: 43113 | 43114;
+  returnTo?: string;
 }) {
   const [address, setAddress] = useState<`0x${string}` | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -303,6 +305,14 @@ export function ConfirmClient({
             Signed, sealed, and delivered to your agent. The capability below
             contains no readable payment signature. You can close this page.
           </p>
+          {returnTo && (
+            <a
+              href={returnTo}
+              className="block w-full rounded bg-emerald-500 px-6 py-3 text-center font-semibold text-black transition-colors hover:bg-emerald-400"
+            >
+              Continue to order status →
+            </a>
+          )}
           <div className="rounded border border-neutral-800 bg-neutral-900 p-3">
             <p className="mb-2 text-xs uppercase tracking-wider text-neutral-500">
               Sealed confirmation capability
