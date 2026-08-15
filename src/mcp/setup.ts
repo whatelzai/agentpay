@@ -141,7 +141,16 @@ export const AGENTPAY_TOOLS = [
 
 export function buildAgentPayServer(ctx: ToolContext): Server {
   const server = new Server(
-    { name: "agentpay", version: pkg.version },
+    {
+      name: "agentpay",
+      version: pkg.version,
+      icons: [
+        {
+          src: "https://agentpay-tan.vercel.app/agentpay-mark.svg",
+          mimeType: "image/svg+xml",
+        },
+      ],
+    },
     {
       capabilities: { tools: {} },
       instructions: AGENTPAY_INSTRUCTIONS,
