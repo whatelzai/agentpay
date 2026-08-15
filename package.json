@@ -1,50 +1,18 @@
 {
-  "name": "@aisystemresources/agentpay",
-  "version": "0.1.0",
-  "description": "AgentPay CLI — trust layer for AI-agent payments. Closes the prompt-injection gap the card layer alone cannot.",
-  "bin": {
-    "agentpay": "bin/agentpay.mjs"
-  },
-  "files": [
-    "bin/",
-    "dist/",
-    "README.md"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "engines": {
-    "node": ">=20"
-  },
+  "name": "agentpay",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "AgentPay — the trust layer that lets AI agents spend safely. StraitsX AgentiX Playground, Track 2.",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "mcp": "tsx src/mcp/server.ts",
-    "cli:dev": "tsx src/cli/index.ts",
-    "build:cli": "node scripts/build-cli.mjs",
-    "prepublishOnly": "npm run build:cli"
+    "mint:sandbox": "tsx scripts/mint-test.ts sandbox",
+    "mint:production": "tsx scripts/mint-test.ts production"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
-    "commander": "^12.1.0",
-    "next": "^16.2.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "viem": "^2.21.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "esbuild": "^0.24.0",
-    "eslint": "^9",
-    "eslint-config-next": "^16.2.0",
-    "postcss": "^8",
-    "tailwindcss": "^4",
-    "tsx": "^4",
-    "typescript": "^5"
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
   }
 }
