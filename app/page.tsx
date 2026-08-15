@@ -113,6 +113,32 @@ export default function Home() {
                 <li>Save. AgentPay tools appear in the composer.</li>
               </ol>
             </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Terminal / CLI</h3>
+              <p className="text-sm text-neutral-500 mb-4">
+                For Claude Code, Codex CLI, or any terminal-based agent. Node
+                20+ required.
+              </p>
+              <pre className="bg-neutral-900 border border-neutral-800 rounded p-4 text-xs text-neutral-300 overflow-x-auto">
+                {`npm install -g @aisystemresources/agentpay
+
+# health check
+agentpay ping
+
+# request a signed confirmation URL
+agentpay confirm -m "Starbucks" -a 5.50
+
+# after signing, mint a card against the token
+agentpay mint -t <base64-token> -m "Starbucks" -a 5.50`}
+              </pre>
+              <p className="text-sm text-neutral-500 mt-3">
+                Or one-shot without install:{" "}
+                <code className="text-emerald-400 text-xs">
+                  npx -p @aisystemresources/agentpay agentpay ping
+                </code>
+              </p>
+            </div>
           </div>
 
           <p className="text-sm text-neutral-500 mt-8">
@@ -122,13 +148,6 @@ export default function Home() {
               connected.&rdquo;
             </em>{" "}
             You should see a version string and the transport mode.
-          </p>
-          <p className="text-sm text-neutral-500 mt-4">
-            Claude Code / terminal-based agents: a native{" "}
-            <code className="text-emerald-400 text-xs">
-              @aisystemresources/agentpay
-            </code>{" "}
-            CLI ships in phase 3.
           </p>
         </div>
       </div>
