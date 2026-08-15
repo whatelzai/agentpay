@@ -1,0 +1,95 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { classifyBlockReason } from "../app/_components/BlocksTable";
+import { buildKpiRects } from "../app/_components/KpiRects";
+import { getMonitorEnvironment } from "../src/lib/monitor";
+import {
+  normalizeKpiSnapshot,
+  type KpiSnapshot,
+} from "../src/lib/supabase/server";
+
+const measuredSnapshot: KpiSnapshot = {
+  unauthorized_spends: 0,
+  attacks_blocked: 5,
+  authorized_count: 3,
+  completed_count: 8,
+  observed_attempts: 8,
+  intent_fidelity_pct: 100,
+  median_sign_time_ms: 7_000,
+  window_days: 30,
+  as_of: "2026-08-15T00:00:00.000Z",
+};
+
+test("unavailable KPI telemetry never renders a green zero", () => {
+  const cards = buildKpiRects(null);
+
+  assert.equal(cards[0].value, "—");
+  assert.ok(cards.every((card) => card.status === "not measured"));
+  assert.ok(cards.every((card) => card.tone === "unavailable"));
+});
+
+test("KPI normalization does not double-count refusals or invent fidelity", () => {
+  const snapshot = normalizeKpiSnapshot(
+    {
+      unauthorized_spends: 0,
+      attacks_blocked: 5,
+      authorized_count: 0,
+      completed_count: 5,
+      median_sign_time_ms: 12_078,
+    },
+    30,
+    "2026-08-15T00:00:00.000Z",
+  );
+
+  assert.equal(snapshot?.observed_attempts, 5);
+  assert.equal(snapshot?.intent_fidelity_pct, null);
+});
+
+test("measured KPI telemetry exposes safety, utility, and sample-aware states", () => {
+  const cards = buildKpiRects(measuredSnapshot);
+
+  assert.deepEqual(
+    cards.map(({ label, value, status }) => ({ label, value, status })),
+    [
+      { label: "Safety incidents", value: "0", status: "on target" },
+      { label: "Safety refusals", value: "5", status: "observed" },
+      { label: "Intent fidelity", value: "100.0%", status: "on target" },
+      { label: "Median sign", value: "7.0s", status: "on target" },
+    ],
+  );
+});
+
+test("an empty measurement window is not presented as proof of safety", () => {
+  const cards = buildKpiRects({
+    ...measuredSnapshot,
+    attacks_blocked: 0,
+    authorized_count: 0,
+    completed_count: 0,
+    observed_attempts: 0,
+    intent_fidelity_pct: null,
+    median_sign_time_ms: null,
+  });
+
+  assert.ok(cards.every((card) => card.value === "—"));
+  assert.ok(cards.every((card) => card.status === "not measured"));
+});
+
+test("refusal reasons distinguish unsafe requests from operational failures", () => {
+  assert.deepEqual(classifyBlockReason("tuple_diverged"), {
+    label: "Intent mismatch",
+    tone: "risk",
+  });
+  assert.deepEqual(classifyBlockReason("capability_open_failed"), {
+    label: "Capability error",
+    tone: "operational",
+  });
+});
+
+test("production monitor configuration redacts purchase details", () => {
+  assert.deepEqual(getMonitorEnvironment("production"), {
+    label: "Production",
+    revealPurchaseDetails: false,
+  });
+  assert.equal(getMonitorEnvironment("sandbox").revealPurchaseDetails, true);
+  assert.equal(getMonitorEnvironment("unexpected").revealPurchaseDetails, false);
+});

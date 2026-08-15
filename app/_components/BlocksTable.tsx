@@ -20,6 +20,47 @@ const REASON_LABEL: Record<string, string> = {
   rail_failed_pre_payment: "Rail refused before any payment was sent",
 };
 
+type BlockClass = {
+  label: string;
+  tone: "risk" | "proof" | "policy" | "operational";
+};
+
+const REASON_CLASS: Record<string, BlockClass> = {
+  tuple_diverged: { label: "Intent mismatch", tone: "risk" },
+  nonce_already_used: { label: "Replay", tone: "risk" },
+  payment_hash_swapped: { label: "Proof swapped", tone: "risk" },
+  signer_not_payer: { label: "Signer mismatch", tone: "proof" },
+  confirmation_sig_invalid: { label: "Invalid proof", tone: "proof" },
+  payment_proof_invalid: { label: "Invalid proof", tone: "proof" },
+  unsealed_v2_token: { label: "Protocol violation", tone: "proof" },
+  amount_out_of_card_range: { label: "Policy refusal", tone: "policy" },
+  capability_open_failed: { label: "Capability error", tone: "operational" },
+  token_decode_failed: { label: "Capability error", tone: "operational" },
+  chain_id_mismatch: { label: "Configuration", tone: "operational" },
+  v1_signer_not_owner: { label: "Configuration", tone: "operational" },
+  v1_wrong_funding_mode: { label: "Configuration", tone: "operational" },
+  v2_wrong_funding_mode: { label: "Configuration", tone: "operational" },
+  demo_owner_unconfigured: { label: "Configuration", tone: "operational" },
+  rail_config_failed: { label: "Rail failure", tone: "operational" },
+  rail_failed_pre_payment: { label: "Rail failure", tone: "operational" },
+};
+
+export function classifyBlockReason(reasonCode: string | null): BlockClass {
+  return (
+    (reasonCode ? REASON_CLASS[reasonCode] : undefined) ?? {
+      label: "Safety refusal",
+      tone: "policy",
+    }
+  );
+}
+
+const CLASS_STYLE: Record<BlockClass["tone"], string> = {
+  risk: "border-seal/50 text-seal",
+  proof: "border-amber-300/40 text-amber-300",
+  policy: "border-ink/30 text-ink/70",
+  operational: "border-rule text-muted",
+};
+
 function shortenMerchant(s: string | null): string {
   if (!s) return "—";
   const cleaned = s.replace(/[\x00-\x1f\x7f]/g, "").trim();
@@ -68,14 +109,27 @@ function TuplePair({
   );
 }
 
-export function BlocksTable({ blocks }: { blocks: RecentBlock[] }) {
+export function BlocksTable({
+  blocks,
+  revealPurchaseDetails = true,
+}: {
+  blocks: RecentBlock[] | null;
+  revealPurchaseDetails?: boolean;
+}) {
+  if (blocks === null) {
+    return (
+      <p className="text-sm text-muted font-mono border border-rule p-6">
+        Refusal telemetry is unavailable. No safety conclusion is inferred from
+        the missing feed.
+      </p>
+    );
+  }
+
   if (blocks.length === 0) {
     return (
       <p className="text-sm text-muted italic font-mono border-t border-ink/40 pt-6">
-        No refusals in the current window. Try an attack via the MCP server:
-        sign a Confirmation for one merchant, then call{" "}
-        <code className="text-ink">execute_purchase</code> with a different
-        merchant — the binding will refuse and a row will land here.
+        No refusals were returned in the recent sample. This is not treated as
+        proof of safety without the observed-decision count above.
       </p>
     );
   }
@@ -83,6 +137,9 @@ export function BlocksTable({ blocks }: { blocks: RecentBlock[] }) {
   return (
     <div className="border border-rule overflow-x-auto">
       <table className="w-full text-left border-collapse">
+        <caption className="sr-only">
+          Recent AgentPay safety refusals and their classification
+        </caption>
         <thead>
           <tr className="border-b border-rule bg-ink/[0.03]">
             <th className="px-4 py-3 text-[10px] tracking-[0.18em] uppercase text-muted font-mono font-medium whitespace-nowrap">
@@ -90,6 +147,9 @@ export function BlocksTable({ blocks }: { blocks: RecentBlock[] }) {
             </th>
             <th className="px-4 py-3 text-[10px] tracking-[0.18em] uppercase text-muted font-mono font-medium whitespace-nowrap">
               Reason
+            </th>
+            <th className="px-4 py-3 text-[10px] tracking-[0.18em] uppercase text-muted font-mono font-medium whitespace-nowrap">
+              Class
             </th>
             <th className="px-4 py-3 text-[10px] tracking-[0.18em] uppercase text-muted font-mono font-medium whitespace-nowrap">
               Agent asked
@@ -104,17 +164,25 @@ export function BlocksTable({ blocks }: { blocks: RecentBlock[] }) {
         </thead>
         <tbody>
           {blocks.map((b) => {
-            const askedMerchant = shortenMerchant(b.merchant);
-            const signedMerchant = shortenMerchant(b.signed_merchant);
+            const askedMerchant = revealPurchaseDetails
+              ? shortenMerchant(b.merchant)
+              : "Redacted";
+            const signedMerchant = revealPurchaseDetails
+              ? shortenMerchant(b.signed_merchant)
+              : "Redacted";
             const hasSigned = b.signed_merchant != null;
             const merchantDiffers =
+              revealPurchaseDetails &&
               hasSigned &&
               askedMerchant.toLowerCase() !== signedMerchant.toLowerCase();
             const amountDiffers =
-              hasSigned && b.amount_sgd_cents !== b.signed_amount_sgd_cents;
+              revealPurchaseDetails &&
+              hasSigned &&
+              b.amount_sgd_cents !== b.signed_amount_sgd_cents;
             const label =
               (b.reason_code && REASON_LABEL[b.reason_code]) ??
               "Refused by AgentPay";
+            const classification = classifyBlockReason(b.reason_code);
             return (
               <tr
                 key={b.correlation_id + b.created_at}
@@ -127,9 +195,18 @@ export function BlocksTable({ blocks }: { blocks: RecentBlock[] }) {
                   {b.reason_code ?? "refused"}
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
+                  <span
+                    className={`inline-block border px-2 py-1 text-[9px] tracking-[0.12em] uppercase font-mono ${CLASS_STYLE[classification.tone]}`}
+                  >
+                    {classification.label}
+                  </span>
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap">
                   <TuplePair
                     merchant={askedMerchant}
-                    amountCents={b.amount_sgd_cents}
+                    amountCents={
+                      revealPurchaseDetails ? b.amount_sgd_cents : null
+                    }
                     merchantHighlight={merchantDiffers}
                     amountHighlight={amountDiffers}
                   />
@@ -138,7 +215,11 @@ export function BlocksTable({ blocks }: { blocks: RecentBlock[] }) {
                   {hasSigned ? (
                     <TuplePair
                       merchant={signedMerchant}
-                      amountCents={b.signed_amount_sgd_cents}
+                      amountCents={
+                        revealPurchaseDetails
+                          ? b.signed_amount_sgd_cents
+                          : null
+                      }
                       merchantHighlight={merchantDiffers}
                       amountHighlight={amountDiffers}
                     />
