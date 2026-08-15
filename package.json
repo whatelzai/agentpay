@@ -1,7 +1,11 @@
 {
   "name": "@aisystemresources/agentpay",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "AgentPay CLI — trust layer for AI-agent payments. Closes the prompt-injection gap the card layer alone cannot.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whatelzai/agentpay.git"
+  },
   "bin": {
     "agentpay": "bin/agentpay.mjs"
   },
