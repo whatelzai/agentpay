@@ -319,7 +319,7 @@ async function main() {
     check("names expiry", text.includes("expired"));
   }
 
-  console.log("S7 — amount outside the 5–30 SGD rail range");
+  console.log("S7 — amount outside the 5–50 SGD rail range");
   {
     const token = await makeToken({ merchant: "Book Store", amountCents: 300n });
     const { result, text } = await run({
@@ -328,7 +328,7 @@ async function main() {
       amount_sgd: 3,
     });
     check("refused", result.isError === true);
-    check("names the range", text.includes("5–30 SGD"));
+    check("names the range", text.includes("5–50 SGD"));
   }
 
   console.log("S8 — rail-edge defence: tampered 402 challenge (demands 2×)");

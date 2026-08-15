@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   const amountCents = sgdToCents(product.priceSgd);
   if (amountCents === null || !isSupportedCardAmount(amountCents)) {
     return NextResponse.json(
-      { error: "product price is outside the 5-30 SGD card range" },
+      { error: "product price is outside the 5-50 SGD card range" },
       { status: 500 },
     );
   }

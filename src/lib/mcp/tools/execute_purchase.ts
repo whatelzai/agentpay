@@ -345,7 +345,7 @@ Block Receipt ${receipt.id} logged.`,
 
   if (!isSupportedCardAmount(decoded.amountSgd)) {
     const receipt = await recordBlockReceipt({
-      reason: `amount SGD ${(Number(decoded.amountSgd) / 100).toFixed(2)} is outside the 5–30 SGD card range`,
+      reason: `amount SGD ${(Number(decoded.amountSgd) / 100).toFixed(2)} is outside the 5–50 SGD card range`,
       requested,
       confirmed,
     });
@@ -353,7 +353,7 @@ Block Receipt ${receipt.id} logged.`,
       signerAddress: verification.recoveredAddress,
     });
     return refusal(
-      `⛔ EXECUTE REFUSED — amount SGD ${(Number(decoded.amountSgd) / 100).toFixed(2)} is outside the rail's 5–30 SGD card range.\nBlock Receipt ${receipt.id} logged.`,
+      `⛔ EXECUTE REFUSED — amount SGD ${(Number(decoded.amountSgd) / 100).toFixed(2)} is outside the rail's 5–50 SGD card range.\nBlock Receipt ${receipt.id} logged.`,
     );
   }
 
