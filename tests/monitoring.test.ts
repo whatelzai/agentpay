@@ -57,10 +57,26 @@ test("measured KPI telemetry exposes safety, utility, and sample-aware states", 
     [
       { label: "Safety incidents", value: "0", status: "on target" },
       { label: "Safety refusals", value: "5", status: "observed" },
-      { label: "Intent fidelity", value: "100.0%", status: "on target" },
+      { label: "Intent fidelity", value: "100%", status: "on target" },
       { label: "Median sign", value: "7.0s", status: "on target" },
     ],
   );
+});
+
+test("intent fidelity keeps meaningful decimals without trailing zeroes", () => {
+  const whole = buildKpiRects(measuredSnapshot)[2];
+  const fractional = buildKpiRects({
+    ...measuredSnapshot,
+    intent_fidelity_pct: 99.94,
+  })[2];
+  const roundedWhole = buildKpiRects({
+    ...measuredSnapshot,
+    intent_fidelity_pct: 99.96,
+  })[2];
+
+  assert.equal(whole.value, "100%");
+  assert.equal(fractional.value, "99.9%");
+  assert.equal(roundedWhole.value, "100%");
 });
 
 test("every KPI card links to one unique calculation contract", () => {

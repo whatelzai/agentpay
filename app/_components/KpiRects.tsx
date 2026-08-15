@@ -13,6 +13,10 @@ export type KpiRect = {
   tone: "healthy" | "neutral" | "warning" | "danger" | "unavailable";
 };
 
+function formatPercentage(value: number): string {
+  return `${Number(value.toFixed(1))}%`;
+}
+
 export function buildKpiRects(kpi: KpiSnapshot | null): KpiRect[] {
   const windowDays = kpi?.window_days ?? 30;
   const hasSample = (kpi?.observed_attempts ?? 0) > 0;
@@ -55,7 +59,7 @@ export function buildKpiRects(kpi: KpiSnapshot | null): KpiRect[] {
       label: getMonitorMetric("intent-fidelity")!.label,
       value:
         kpi?.intent_fidelity_pct != null && hasExecutedOutcomes
-          ? `${kpi.intent_fidelity_pct.toFixed(1)}%`
+          ? formatPercentage(kpi.intent_fidelity_pct)
           : "—",
       note: "Safe outcomes among payments that moved or may have moved money",
       target: "target: 100%",
@@ -127,7 +131,9 @@ export function KpiRects({ items }: { items: KpiRect[] }) {
             </p>
           </div>
           <div className="flex-1 flex items-center justify-center py-6">
-            <p className="font-body font-semibold text-6xl xl:text-7xl text-ink tabular-nums leading-none tracking-[-0.04em]">
+            <p
+              className={`font-body font-semibold text-ink tabular-nums leading-none tracking-[-0.04em] ${c.value.length >= 5 ? "text-5xl xl:text-6xl" : "text-6xl xl:text-7xl"}`}
+            >
               {c.value}
             </p>
           </div>
