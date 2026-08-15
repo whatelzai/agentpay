@@ -18,9 +18,37 @@ import {
   isSealedConfirmationToken,
   openConfirmationToken,
 } from "../../signing/confirmation_seal";
+import { recordSpendAttempt, type SpendOutcome } from "../../telemetry";
 
 function refusal(text: string): CallToolResult {
   return { content: [{ type: "text", text }], isError: true };
+}
+
+function newCorrelationId(): string {
+  return `att_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+}
+
+function record(
+  correlationId: string,
+  outcome: SpendOutcome,
+  reasonCode: string,
+  requested: { merchant: string; amountSgdCents: bigint | number },
+  extras: {
+    signerAddress?: string;
+    rail?: string;
+    railStatus?: string;
+    evidenceUri?: string;
+  } = {},
+): void {
+  recordSpendAttempt({
+    correlationId,
+    outcome,
+    decision: outcome === "authorized" ? "allowed" : "blocked",
+    reasonCode,
+    merchant: requested.merchant,
+    amountSgdCents: Number(requested.amountSgdCents),
+    ...extras,
+  });
 }
 
 export async function executePurchase(
@@ -50,6 +78,7 @@ export async function executePurchase(
     merchant,
     amountSgdCents: requestedAmountCents,
   };
+  let correlationId = newCorrelationId();
 
   let serializedToken = confirmationToken;
   const isSealed = isSealedConfirmationToken(confirmationToken);
@@ -61,6 +90,7 @@ export async function executePurchase(
         reason: `confirmation capability could not be opened: ${(error as Error).message}`,
         requested,
       });
+      record(correlationId, "refused_invalid_sig", "capability_open_failed", requested);
       return refusal(
         `EXECUTE REFUSED - confirmation capability could not be opened.
 Block Receipt ${receipt.id} logged.`,
@@ -76,9 +106,13 @@ Block Receipt ${receipt.id} logged.`,
       reason: `confirmation_token could not be decoded: ${(e as Error).message}`,
       requested,
     });
+    record(correlationId, "refused_invalid_sig", "token_decode_failed", requested);
     return refusal(
       `⛔ EXECUTE REFUSED — confirmation_token could not be decoded: ${(e as Error).message}\nBlock Receipt ${receipt.id} logged.`,
     );
+  }
+  if (decoded.version === 2) {
+    correlationId = decoded.requestId;
   }
   if (decoded.version === 2 && !isSealed) {
     const confirmed = {
@@ -90,6 +124,7 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
+    record(correlationId, "refused_invalid_sig", "unsealed_v2_token", requested);
     return refusal(
       `EXECUTE REFUSED - user-wallet confirmations must be AgentPay-sealed so the agent cannot access the payment signature.
 Block Receipt ${receipt.id} logged.`,
@@ -107,6 +142,7 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
+    record(correlationId, "refused_invalid_sig", "confirmation_sig_invalid", requested);
     return refusal(
       `⛔ EXECUTE REFUSED — signature verification failed: ${verification.reason}\nBlock Receipt ${receipt.id} logged.`,
     );
@@ -121,6 +157,9 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
+    record(correlationId, "refused_other", "rail_config_failed", requested, {
+      signerAddress: verification.recoveredAddress,
+    });
     return refusal(
       `EXECUTE REFUSED - payment rail configuration failed closed.\nBlock Receipt ${receipt.id} logged.`,
     );
@@ -132,6 +171,9 @@ Block Receipt ${receipt.id} logged.`,
         reason: "legacy confirmation cannot use user_wallet funding",
         requested,
         confirmed,
+      });
+      record(correlationId, "refused_other", "v1_wrong_funding_mode", requested, {
+        signerAddress: verification.recoveredAddress,
       });
       return refusal(
         `EXECUTE REFUSED - this legacy confirmation has no user payment authorization.\nBlock Receipt ${receipt.id} logged.`,
@@ -147,6 +189,9 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
+      record(correlationId, "refused_other", "demo_owner_unconfigured", requested, {
+        signerAddress: verification.recoveredAddress,
+      });
       return refusal(
         `EXECUTE REFUSED - platform_wallet mode has no registered demo owner.\nBlock Receipt ${receipt.id} logged.`,
       );
@@ -156,6 +201,9 @@ Block Receipt ${receipt.id} logged.`,
         reason: `signer ${verification.recoveredAddress} is not the registered demo owner`,
         requested,
         confirmed,
+      });
+      record(correlationId, "refused_invalid_sig", "v1_signer_not_owner", requested, {
+        signerAddress: verification.recoveredAddress,
       });
       return refusal(
         [
@@ -173,6 +221,9 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
+      record(correlationId, "refused_other", "v2_wrong_funding_mode", requested, {
+        signerAddress: verification.recoveredAddress,
+      });
       return refusal(
         `EXECUTE REFUSED - the signed funding model does not match this deployment.\nBlock Receipt ${receipt.id} logged.`,
       );
@@ -186,6 +237,9 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
+      record(correlationId, "refused_invalid_sig", "signer_not_payer", requested, {
+        signerAddress: verification.recoveredAddress,
+      });
       return refusal(
         `EXECUTE REFUSED - the confirming wallet is not the wallet funding the payment.\nBlock Receipt ${receipt.id} logged.`,
       );
@@ -196,6 +250,9 @@ Block Receipt ${receipt.id} logged.`,
         reason: "confirmation chain does not match the configured rail",
         requested,
         confirmed,
+      });
+      record(correlationId, "refused_other", "chain_id_mismatch", requested, {
+        signerAddress: verification.recoveredAddress,
       });
       return refusal(
         `EXECUTE REFUSED - confirmation chain does not match the configured rail.\nBlock Receipt ${receipt.id} logged.`,
@@ -212,6 +269,9 @@ Block Receipt ${receipt.id} logged.`,
         requested,
         confirmed,
       });
+      record(correlationId, "refused_invalid_sig", "payment_proof_invalid", requested, {
+        signerAddress: verification.recoveredAddress,
+      });
       return refusal(
         `EXECUTE REFUSED - payment authorization failed: ${paymentVerification.reason}\nBlock Receipt ${receipt.id} logged.`,
       );
@@ -224,6 +284,9 @@ Block Receipt ${receipt.id} logged.`,
         reason: "payment authorization does not match the signed Confirmation",
         requested,
         confirmed,
+      });
+      record(correlationId, "refused_invalid_sig", "payment_hash_swapped", requested, {
+        signerAddress: verification.recoveredAddress,
       });
       return refusal(
         `EXECUTE REFUSED - the payment authorization was replaced after confirmation.\nBlock Receipt ${receipt.id} logged.`,
@@ -252,6 +315,9 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
+    record(correlationId, "refused_mismatch", "tuple_diverged", requested, {
+      signerAddress: verification.recoveredAddress,
+    });
     return refusal(
       [
         "⛔ EXECUTE REFUSED — agent request diverges from user signature:",
@@ -272,6 +338,9 @@ Block Receipt ${receipt.id} logged.`,
       requested,
       confirmed,
     });
+    record(correlationId, "refused_other", "amount_out_of_card_range", requested, {
+      signerAddress: verification.recoveredAddress,
+    });
     return refusal(
       `⛔ EXECUTE REFUSED — amount SGD ${(Number(decoded.amountSgd) / 100).toFixed(2)} is outside the rail's 5–30 SGD card range.\nBlock Receipt ${receipt.id} logged.`,
     );
@@ -283,6 +352,9 @@ Block Receipt ${receipt.id} logged.`,
       reason: "replayed confirmation token — nonce already used",
       requested,
       confirmed,
+    });
+    record(correlationId, "refused_replay", "nonce_already_used", requested, {
+      signerAddress: verification.recoveredAddress,
     });
     return refusal(
       `⛔ EXECUTE REFUSED — this confirmation token was already used. One signature authorizes exactly one mint.\nBlock Receipt ${receipt.id} logged.`,
@@ -301,6 +373,11 @@ Block Receipt ${receipt.id} logged.`,
     if (!mint.paymentAttempted) {
       // Failed before any payment was signed or sent: retry is free.
       releaseNonce(decoded.nonce);
+      record(correlationId, "refused_other", "rail_failed_pre_payment", requested, {
+        signerAddress: verification.recoveredAddress,
+        rail: rail.id,
+        railStatus: mint.reason,
+      });
       return refusal(
         `Error: the mint failed at the rail — ${mint.reason}\nNo payment was sent. Your confirmation was NOT consumed; it is safe to retry until it expires.`,
       );
@@ -308,6 +385,11 @@ Block Receipt ${receipt.id} logged.`,
     // Payment was sent; the facilitator settles on-chain BEFORE returning the
     // card, so the XSGD may be gone even though this response failed. Keep
     // the nonce consumed — an automatic retry could pay twice.
+    record(correlationId, "unauthorized", "rail_failed_post_payment", requested, {
+      signerAddress: verification.recoveredAddress,
+      rail: rail.id,
+      railStatus: mint.reason,
+    });
     return refusal(
       [
         `Error: the rail failed AFTER payment was sent — ${mint.reason}`,
@@ -338,6 +420,13 @@ Block Receipt ${receipt.id} logged.`,
     cardOpaqueId: mint.cardOpaqueId,
     settlementTx: mint.settlementTx,
     iframeUrl: mint.iframeUrl,
+  });
+
+  record(correlationId, "authorized", "mint_ok", requested, {
+    signerAddress: verification.recoveredAddress,
+    rail: rail.id,
+    railStatus: "settled",
+    evidenceUri: mint.snowtraceUrl,
   });
 
   return {
