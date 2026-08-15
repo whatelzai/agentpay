@@ -3,6 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buildKpiRects } from "../../_components/KpiRects";
 import {
+  SectionKicker,
+  SiteFooter,
+  SiteHeader,
+  siteFrameClassName,
+} from "../../_components/SiteChrome";
+import {
   getMonitorMetric,
   MONITOR_METRICS,
 } from "@/src/lib/monitor-metrics";
@@ -28,26 +34,6 @@ const CURRENT_STATUS_STYLE = {
   danger: "border-seal/60 text-seal",
   unavailable: "border-rule text-muted",
 } as const;
-
-function Mark({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        d="M4 10 C 10 14, 14 20, 22 22"
-        stroke="currentColor"
-        strokeWidth="2.25"
-        strokeLinecap="round"
-      />
-      <circle cx="24" cy="22" r="3.25" fill="#39FF14" />
-    </svg>
-  );
-}
 
 export function generateStaticParams() {
   return MONITOR_METRICS.map(({ slug }) => ({ metric: slug }));
@@ -81,34 +67,9 @@ export default async function MetricPage({ params }: MetricPageProps) {
 
   return (
     <main className="min-h-screen bg-void text-ink">
-      <header className="max-w-6xl mx-auto px-6 md:px-10 pt-6 md:pt-8 flex items-center justify-between">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-ink hover:text-neon transition-colors"
-          aria-label="AgentPay home"
-        >
-          <Mark className="w-6 h-6" />
-          <span className="font-mono text-sm tracking-[0.14em] uppercase">
-            agentpay
-          </span>
-        </Link>
-        <nav className="flex items-center gap-6 text-xs font-mono uppercase tracking-[0.14em]">
-          <Link
-            href="/monitor"
-            className="text-muted hover:text-neon transition-colors"
-          >
-            Scoreboard
-          </Link>
-          <a
-            href="https://github.com/whatelzai/agentpay"
-            className="text-muted hover:text-neon transition-colors"
-          >
-            GitHub
-          </a>
-        </nav>
-      </header>
+      <SiteHeader active="monitor" />
 
-      <section className="max-w-6xl mx-auto px-6 md:px-10 pt-20 md:pt-28 pb-20">
+      <section className={`${siteFrameClassName} pb-20 pt-20 md:pt-28`}>
         <Link
           href="/monitor"
           className="inline-flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase text-muted hover:text-neon font-mono transition-colors"
@@ -116,9 +77,11 @@ export default async function MetricPage({ params }: MetricPageProps) {
           <span aria-hidden="true">←</span>
           Back to scoreboard
         </Link>
-        <p className="mt-14 text-[11px] tracking-[0.22em] uppercase text-neon font-mono">
-          Metric contract · rolling {kpi?.window_days ?? 30}d
-        </p>
+        <div className="mt-14">
+          <SectionKicker>
+            Metric contract · rolling {kpi?.window_days ?? 30}d
+          </SectionKicker>
+        </div>
         <h1 className="mt-6 font-body font-semibold text-4xl md:text-6xl tracking-[-0.04em] leading-[1.02] max-w-4xl">
           How AgentPay calculates{" "}
           <span className="text-neon">{metric.label.toLowerCase()}</span>.
@@ -128,7 +91,7 @@ export default async function MetricPage({ params }: MetricPageProps) {
         </p>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 border-t border-rule">
+      <section className={`${siteFrameClassName} border-t border-rule py-16`}>
         <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-6">
           <div className="border border-rule p-7 md:p-9 min-h-[310px] flex flex-col">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -198,7 +161,7 @@ export default async function MetricPage({ params }: MetricPageProps) {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 md:px-10 py-20 border-t border-rule">
+      <section className={`${siteFrameClassName} border-t border-rule py-20`}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           <div>
             <p className="text-[10px] tracking-[0.2em] uppercase text-neon font-mono mb-6">
@@ -233,7 +196,7 @@ export default async function MetricPage({ params }: MetricPageProps) {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 md:px-10 py-20 border-t border-rule">
+      <section className={`${siteFrameClassName} border-t border-rule py-20`}>
         <p className="text-[10px] tracking-[0.2em] uppercase text-muted font-mono">
           How to read the status
         </p>
@@ -261,7 +224,7 @@ export default async function MetricPage({ params }: MetricPageProps) {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 md:px-10 py-20 border-t border-rule">
+      <section className={`${siteFrameClassName} border-t border-rule py-20`}>
         <p className="text-[10px] tracking-[0.2em] uppercase text-muted font-mono">
           Other calculations
         </p>
@@ -283,17 +246,7 @@ export default async function MetricPage({ params }: MetricPageProps) {
         </div>
       </section>
 
-      <footer className="max-w-6xl mx-auto px-6 md:px-10 py-10 border-t border-rule flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <p className="text-[10px] tracking-[0.16em] uppercase text-muted font-mono">
-          AgentPay public measurement contract
-        </p>
-        <Link
-          href="/monitor"
-          className="text-[10px] tracking-[0.16em] uppercase text-neon font-mono hover:underline underline-offset-4"
-        >
-          Return to scoreboard
-        </Link>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }
