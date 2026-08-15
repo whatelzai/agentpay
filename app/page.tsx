@@ -37,7 +37,7 @@ export default async function Home() {
             <span className="text-neon">pay</span>
           </h1>
           <p className="mt-8 md:mt-10 text-center text-lg md:text-2xl text-muted font-body">
-            Say bye to prompt injections.
+            Signed intent. Nothing else.
           </p>
           <div className="mt-12 md:mt-14 w-full max-w-xl">
             <HeroConnect />
