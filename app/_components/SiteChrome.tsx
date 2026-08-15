@@ -58,7 +58,7 @@ export function SiteHeader({
                 : "text-muted transition-colors hover:text-neon focus-visible:outline-none focus-visible:text-neon"
             }
           >
-            Scorecard
+            Scoreboard
           </Link>
           <a
             href="https://github.com/whatelzai/agentpay"

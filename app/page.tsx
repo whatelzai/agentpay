@@ -45,7 +45,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Section 2 — Public scorecard: 3 KPIs side by side */}
+      {/* Section 2 — Public scorecard: 4 KPIs side by side */}
       <section className={`${siteFrameClassName} border-t border-rule py-28`}>
         <SectionKicker>Public scorecard</SectionKicker>
         <h2 className="font-body font-semibold text-3xl md:text-5xl tracking-[-0.03em] mt-6 mb-3">
