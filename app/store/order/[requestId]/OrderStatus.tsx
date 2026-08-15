@@ -13,9 +13,10 @@ type OrderReceipt = {
 };
 
 type OrderResponse = {
-  status: "awaiting_signature" | "settled" | "refused";
+  status: "awaiting_signature" | "settled" | "refused" | "rail_failed";
   order?: { slug: string; merchant: string; amountSgd: number };
   receipt?: OrderReceipt;
+  detail?: string;
 };
 
 const POLL_MS = 2500;
@@ -98,25 +99,49 @@ export function OrderStatus({
     );
   }
 
-  // refused — the S2 payoff: the confirmed-vs-requested Tuple diff, on screen.
+  if (data.status === "refused") {
+    // The S2 payoff: AgentPay's own Binding refused the mint. A signed
+    // Block Receipt exists — show the confirmed-vs-requested Tuple diff.
+    return (
+      <div className="rounded-xl border border-[#e3a3a3] bg-[#fdecec] p-5">
+        <p className="text-sm font-semibold text-[#b32a2a] mb-2">
+          ⛔ Blocked by AgentPay — signed Block Receipt
+        </p>
+        <p className="text-sm text-[#432b21]/80 mb-3">{data.receipt?.reason}</p>
+        {data.receipt?.requested && data.receipt?.confirmed ? (
+          <div className="text-xs font-mono text-[#432b21]/80 space-y-1">
+            <p>
+              requested: {data.receipt.requested.merchant} / SGD{" "}
+              {(Number(data.receipt.requested.amountSgdCents) / 100).toFixed(2)}
+            </p>
+            <p>
+              confirmed: {data.receipt.confirmed.merchant} / SGD{" "}
+              {(Number(data.receipt.confirmed.amountSgdCents) / 100).toFixed(2)}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  // rail_failed — the S3 payoff. StraitsX declined settlement (e.g. the
+  // sandbox wallet doesn't have enough XSGD for this order) — no Block
+  // Receipt exists, because AgentPay never refused this Tuple. Distinct
+  // styling and copy on purpose (SIG-018 block-attribution): AgentPay blocks
+  // what the user never confirmed; StraitsX blocks what the user never
+  // allowed.
   return (
-    <div className="rounded-xl border border-[#e3a3a3] bg-[#fdecec] p-5">
-      <p className="text-sm font-semibold text-[#b32a2a] mb-2">
-        ⛔ Order refused — signed Block Receipt
+    <div className="rounded-xl border border-[#e8c98a] bg-[#fdf3e0] p-5">
+      <p className="text-sm font-semibold text-[#8a5a1a] mb-2">
+        ⚠ Blocked by the payment rail (StraitsX) — not an AgentPay refusal
       </p>
-      <p className="text-sm text-[#432b21]/80 mb-3">{data.receipt?.reason}</p>
-      {data.receipt?.requested && data.receipt?.confirmed ? (
-        <div className="text-xs font-mono text-[#432b21]/80 space-y-1">
-          <p>
-            requested: {data.receipt.requested.merchant} / SGD{" "}
-            {(Number(data.receipt.requested.amountSgdCents) / 100).toFixed(2)}
-          </p>
-          <p>
-            confirmed: {data.receipt.confirmed.merchant} / SGD{" "}
-            {(Number(data.receipt.confirmed.amountSgdCents) / 100).toFixed(2)}
-          </p>
-        </div>
-      ) : null}
+      <p className="text-sm text-[#432b21]/80 mb-1">
+        AgentPay confirmed this Tuple matched what you signed — the mint
+        itself was declined at settlement.
+      </p>
+      <p className="text-xs font-mono text-[#432b21]/70 whitespace-pre-wrap mt-3">
+        {data.detail}
+      </p>
     </div>
   );
 }
