@@ -436,9 +436,13 @@ async function submitCardMint(
     // A paid request with an empty or malformed response is still consumed.
   }
   if (response.status !== 200) {
+    const bodyDetail =
+      (typeof card.error === "string" && card.error) ||
+      (typeof card.message === "string" && card.message) ||
+      rawText.slice(0, 300);
     return {
       ok: false,
-      reason: `mint rejected after payment: HTTP ${response.status}`,
+      reason: `mint rejected after payment: HTTP ${response.status}${bodyDetail ? ` — ${bodyDetail}` : ""}`,
       paymentAttempted: true,
     };
   }
