@@ -86,3 +86,4 @@ Auto-publishes via `.github/workflows/release.yml` when any commit on main bumps
 - Do not add auth (Clerk) or DB (Supabase) until the phase that needs them
 - No test framework yet — add Playwright in phase 2 if pitch requires it
 - Confirmation-scoping binding must be cryptographic (EIP-712-style typed statement), not just UI-rendered
+- Always talk in ASD-STE100 Simplified Technical English. Always read CONTEXT.md files, and use their ubiquitous language.
