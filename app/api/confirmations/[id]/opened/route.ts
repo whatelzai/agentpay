@@ -15,6 +15,6 @@ export async function POST(
   if (!isRequestId(id)) {
     return Response.json({ error: "invalid request id" }, { status: 400 });
   }
-  recordConfirmationOpened(id);
+  await recordConfirmationOpened(id);
   return Response.json({ ok: true });
 }

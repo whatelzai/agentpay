@@ -37,7 +37,7 @@ export async function POST(
     });
   }
   if (result === "stored") {
-    recordConfirmationSigned(id);
+    await recordConfirmationSigned(id);
   }
   if (result === "unavailable") {
     return Response.json(
