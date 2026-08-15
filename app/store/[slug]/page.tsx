@@ -81,8 +81,10 @@ export default async function ProductPage({ params }: { params: Params }) {
                 S2 / Inject after signing
               </p>
               <p className="my-3 text-sm leading-relaxed text-[#432b21]/75">
-                Sign the same Latte. Then the demo agent obeys the hidden page
-                instruction and asks for Evil Store at SGD 28.00.
+                Sign the same Latte. This scripted fallback replays the hidden
+                page instruction deterministically, so AgentPay refuses the
+                mismatch every time. The live attack is a recorded real-agent
+                run on the MCP connector.
               </p>
               <CheckoutButton
                 slug={product.slug}
