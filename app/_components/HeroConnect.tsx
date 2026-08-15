@@ -3,30 +3,23 @@
 import { useState } from "react";
 
 const MCP_URL = "https://agentpay-tan.vercel.app/api/mcp";
-const NPM_INSTALL = "npm install -g @aisystemresources/agentpay";
+const NPM_INSTALL = "npm i -g @aisystemresources/agentpay";
 
 const CONNECTORS = {
   "Claude.ai": {
-    subtitle: "In-app connector",
-    lines: [
-      "Settings → Connectors → Add custom connector",
-      `URL: ${MCP_URL}`,
-    ],
-    copy: MCP_URL,
+    subtitle: "Settings → Connectors → Add custom",
+    snippet: MCP_URL,
+    kind: "url" as const,
   },
   "Claude Code": {
     subtitle: "npm CLI",
-    lines: [NPM_INSTALL, "agentpay ping"],
-    copy: NPM_INSTALL,
+    snippet: NPM_INSTALL,
+    kind: "shell" as const,
   },
   Codex: {
-    subtitle: "Custom MCP (Streamable HTTP)",
-    lines: [
-      "Plugins → MCPs → Add → Connect to a custom MCP",
-      "Type: Streamable HTTP",
-      `URL: ${MCP_URL}`,
-    ],
-    copy: MCP_URL,
+    subtitle: "Plugins → MCPs → Streamable HTTP",
+    snippet: MCP_URL,
+    kind: "url" as const,
   },
 } as const;
 
@@ -39,20 +32,20 @@ export function HeroConnect() {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(c.copy);
+      await navigator.clipboard.writeText(c.snippet);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), 1400);
     } catch {
-      // Ignore clipboard errors — some browsers block outside secure contexts.
+      /* ignore */
     }
   }
 
   return (
-    <div className="border border-neutral-800 rounded-lg p-4 bg-neutral-950">
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
+    <div className="border border-rule bg-paper">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-rule">
         <label
           htmlFor="agent-select"
-          className="text-xs text-neutral-500 uppercase tracking-wider"
+          className="text-[10px] tracking-[0.14em] uppercase text-muted font-mono"
         >
           Connect to
         </label>
@@ -60,7 +53,7 @@ export function HeroConnect() {
           id="agent-select"
           value={agent}
           onChange={(e) => setAgent(e.target.value as Agent)}
-          className="bg-black border border-neutral-800 text-emerald-400 text-sm rounded px-3 py-1.5 focus:outline-none focus:border-emerald-500"
+          className="bg-transparent border-none text-ink text-sm focus:outline-none cursor-pointer font-body"
         >
           {(Object.keys(CONNECTORS) as Agent[]).map((a) => (
             <option key={a} value={a}>
@@ -68,17 +61,25 @@ export function HeroConnect() {
             </option>
           ))}
         </select>
-        <span className="text-xs text-neutral-500">— {c.subtitle}</span>
+        <span className="text-xs text-muted ml-auto hidden sm:block">
+          {c.subtitle}
+        </span>
       </div>
-      <pre className="bg-black border border-neutral-900 rounded p-3 text-xs text-neutral-300 overflow-x-auto whitespace-pre-wrap font-mono">
-        {c.lines.join("\n")}
-      </pre>
-      <button
-        onClick={copy}
-        className="mt-3 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-      >
-        {copied ? "✓ copied" : "copy →"}
-      </button>
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="text-seal font-mono text-sm select-none">
+          {c.kind === "shell" ? "$" : "↳"}
+        </span>
+        <code className="flex-1 font-mono text-sm text-ink truncate">
+          {c.snippet}
+        </code>
+        <button
+          onClick={copy}
+          className="text-[11px] tracking-[0.14em] uppercase text-muted hover:text-ink transition-colors font-mono"
+          aria-label="Copy to clipboard"
+        >
+          {copied ? "copied" : "copy"}
+        </button>
+      </div>
     </div>
   );
 }

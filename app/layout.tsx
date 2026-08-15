@@ -1,10 +1,32 @@
 import type { Metadata } from "next";
+import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-fraunces",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "AgentPay — The trust layer that makes AI spend safely",
+  title: "AgentPay — Every AI purchase matches what you signed",
   description:
-    "Cryptographic confirmation binding for AI-agent payments. Cards handle credential theft. AgentPay closes the prompt-injection gap the card layer alone cannot.",
+    "Cryptographic confirmation binding for AI-agent payments. Cards handle credential theft. AgentPay handles the rest.",
 };
 
 export default function RootLayout({
@@ -13,7 +35,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${fraunces.variable} ${inter.variable} ${plexMono.variable}`}
+    >
       <body className="antialiased">{children}</body>
     </html>
   );
