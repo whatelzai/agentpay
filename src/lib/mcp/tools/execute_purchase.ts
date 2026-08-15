@@ -2,7 +2,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolContext } from "./types";
 import { decodeToken, verifyConfirmation } from "../../binding/verify";
 
-export async function requestCardMint(
+export async function executePurchase(
   _ctx: ToolContext,
   args: Record<string, unknown>,
 ): Promise<CallToolResult> {
@@ -93,7 +93,7 @@ export async function requestCardMint(
     };
   }
 
-  // Match. In phase 3c this proxies to card.straitsx.ai/production/sse for a real card mint.
+  // Match. In phase 3c this calls card.straitsx.ai issue_card over HTTP (x402) for a real mint.
   return {
     content: [
       {
@@ -106,7 +106,7 @@ export async function requestCardMint(
           `  amount:   SGD ${(Number(decoded.amountSgd) / 100).toFixed(2)}`,
           `  expires:  ${new Date(Number(decoded.expiryTimestamp) * 1000).toISOString()}`,
           "",
-          "[Phase 3b stub: actual StraitsX card mint via card.straitsx.ai/production/sse ships in phase 3c. Verification layer is live.]",
+          "[Phase 3b stub: the real StraitsX card mint ships in phase 3c. Verification layer is live.]",
         ].join("\n"),
       },
     ],

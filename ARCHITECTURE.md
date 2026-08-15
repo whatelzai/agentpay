@@ -10,8 +10,8 @@
  USER (human)                        AI AGENT (untrusted)
    │                                    │
    │ opens /confirm URL,                │ MCP tools: ping ·
-   │ signs Tuple (EIP-712,              │ confirm_purchase ·
-   │ MetaMask)                          │ request_card_mint
+   │ signs Tuple (EIP-712,              │ propose_purchase ·
+   │ MetaMask)                          │ execute_purchase
    ▼                                    ▼
  ┌──────────────────────────────────────────────────────┐
  │  AGENTPAY  (this repo — Next.js on Vercel)           │
@@ -41,7 +41,7 @@
 
 ## The flow, step by step
 
-1. Agent calls `confirm_purchase({merchant, amount_sgd, expiry_seconds?})`.
+1. Agent calls `propose_purchase({merchant, amount_sgd, expiry_seconds?})`.
    AgentPay returns a `/confirm?merchant=..&amount=..&expiry=..` URL. No money can move yet.
 2. User opens the URL. The page shows the Tuple. The user connects a wallet and signs
    EIP-712 typed data: domain `AgentPay v1, chainId 43114`; message
@@ -49,7 +49,7 @@
 3. The page emits a **Confirmation Token** (base64url of message + signature + signer).
    The user hands it to the agent (paste into chat). The token is not a secret —
    tampering breaks the signature.
-4. Agent calls `request_card_mint({confirmation_token, merchant, amount_sgd})`.
+4. Agent calls `execute_purchase({confirmation_token, merchant, amount_sgd})`.
    The Mint Gate: decode → recover signer → check expiry → assert merchant and amount
    match the signed values exactly.
    - **Mismatch → ⛔ MINT REFUSED** with a field-by-field diff. (Planned: emit a Block Receipt.)
@@ -113,7 +113,7 @@ app/                 Next.js App Router
 src/mcp/setup.ts     buildAgentPayServer — tools defined once, both transports
 src/mcp/server.ts    stdio transport entry (npm run mcp)
 src/lib/binding/     schema.ts (EIP-712 types) · verify.ts (decode/recover/verify)
-src/lib/mcp/tools/   ping · confirm_purchase · request_card_mint (the Mint Gate)
+src/lib/mcp/tools/   ping · propose_purchase · execute_purchase (the Mint Gate)
 src/cli/index.ts     commander CLI → npm @aisystemresources/agentpay
 scripts/mint-test.ts proven x402 client (real mainnet mint)
 ```
@@ -137,7 +137,7 @@ scripts/mint-test.ts proven x402 client (real mainnet mint)
 2. Call it from the Mint Gate after the Binding passes. **Direct HTTP — not the SSE MCP.**
    (Decision basis: proven live, no passphrase dependency, and the 402 dance is our
    x402-award story. The SSE MCP stays as fallback.)
-3. Redact per the trust-boundary table: the agent gets `{authorized, settlement_tx,
-   amount_sgd, last4}` — never `card_html`, never `card_opaque_id`.
+3. Redact per the trust-boundary table: the agent gets `{authorized, amount_sgd,
+   settlement_tx, snowtrace_url}` — never `card_html`, never `card_opaque_id`.
 4. Emit the Block Receipt on refusal; log both receipts (mint + block) for the demo feed.
 5. Add the used-nonce store.

@@ -55,7 +55,7 @@ export default async function Confirm({
             Missing required URL params:{" "}
             <code className="text-xs">merchant</code> and{" "}
             <code className="text-xs">amount</code>. Ask your agent to call{" "}
-            <code className="text-xs">confirm_purchase</code> first.
+            <code className="text-xs">propose_purchase</code> first.
           </p>
         )}
 

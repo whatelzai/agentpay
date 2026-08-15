@@ -1,6 +1,6 @@
 {
   "name": "@aisystemresources/agentpay",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "AgentPay CLI — trust layer for AI-agent payments. Closes the prompt-injection gap the card layer alone cannot.",
   "repository": {
     "type": "git",
