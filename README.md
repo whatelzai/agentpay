@@ -28,6 +28,15 @@ Open http://localhost:3000.
 - `npm run build` — production build
 - `npm run start` — serve production build
 - `npm run lint` — ESLint
+- `npm run typecheck` — TypeScript type check
+- `npm run mcp` — run stdio MCP server locally (for CLI use)
+
+## MCP endpoints
+
+- **HTTP:** `https://agentpay-tan.vercel.app/api/mcp` (Claude Desktop / Codex / any HTTP MCP client)
+- **stdio:** `npm run mcp` (local CLI use)
+
+Point your agent at the endpoint — instructions live on the landing page.
 
 ## Branches
 
@@ -36,9 +45,9 @@ Open http://localhost:3000.
 
 ## Phases
 
-- **Phase 1 (current):** Vercel-deployed landing page.
-- **Phase 2:** MCP server. `app/api/mcp/route.ts` (HTTP) + `src/mcp/server.ts` (stdio). Wraps StraitsX card MCP with confirmation-scoping binding.
-- **Phase 3:** CLI at `cli/`. commander-based. `agentpay confirm <intent>` as entry point.
+- **Phase 1:** ✅ Landing page.
+- **Phase 2 (current):** MCP server (HTTP + stdio) with `ping` + `confirm_purchase` (stub).
+- **Phase 3:** CLI at `cli/` with commander + cryptographic EIP-712 confirmation signing + wire to live StraitsX card MCP.
 
 ## Process
 
