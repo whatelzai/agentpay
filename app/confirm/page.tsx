@@ -1,3 +1,5 @@
+import { ConfirmClient } from "./ConfirmClient";
+
 type SearchParams = Promise<{
   merchant?: string;
   amount?: string;
@@ -38,20 +40,32 @@ export default async function Confirm({
             <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">
               Expires in
             </p>
-            <p className="text-lg">{expiry ?? "—"} seconds</p>
+            <p className="text-lg">{expiry ?? "300"} seconds</p>
           </div>
         </div>
 
-        <p className="text-sm text-neutral-500 mb-6">
-          [Phase 2 stub] The cryptographic EIP-712 signing binding ships in phase 3. This page currently displays the parameters the agent proposed — in phase 3 the &ldquo;Sign&rdquo; button will produce a confirmation_token that the card mint layer verifies before issuing.
-        </p>
+        {merchant && amount ? (
+          <ConfirmClient
+            merchant={merchant}
+            amount={amount}
+            expirySeconds={expiry ?? "300"}
+          />
+        ) : (
+          <p className="text-sm text-red-400">
+            Missing required URL params:{" "}
+            <code className="text-xs">merchant</code> and{" "}
+            <code className="text-xs">amount</code>. Ask your agent to call{" "}
+            <code className="text-xs">confirm_purchase</code> first.
+          </p>
+        )}
 
-        <button
-          className="w-full bg-emerald-500 text-black font-semibold px-6 py-3 rounded transition-colors opacity-40 cursor-not-allowed"
-          disabled
-        >
-          Sign to authorize (phase 3)
-        </button>
+        <p className="text-xs text-neutral-600 mt-8">
+          Your signature is a cryptographic commitment to (merchant, amount,
+          expiry, nonce) via EIP-712 typed data. The card mint layer verifies
+          this signature against the agent&apos;s mint request. Divergence
+          refuses the mint. Prompt injection between signature and mint cannot
+          hijack the purchase.
+        </p>
       </div>
     </main>
   );
