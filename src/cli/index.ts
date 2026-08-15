@@ -82,6 +82,21 @@ program
     },
   );
 
+program
+  .command("receipt")
+  .description(
+    "Fetch a Mint Gate receipt — proof chain of a mint, or the signed Block Receipt of a refusal. Omit --id for the latest.",
+  )
+  .option("-i, --id <receipt_id>", "Receipt id (rcpt_…) from an execute result")
+  .option("-e, --endpoint <url>", "MCP endpoint URL", DEFAULT_ENDPOINT)
+  .action(async (opts: { id?: string; endpoint: string }) => {
+    await callTool(
+      opts.endpoint,
+      "get_receipt",
+      opts.id ? { receipt_id: opts.id } : {},
+    );
+  });
+
 async function callTool(
   endpoint: string,
   name: string,

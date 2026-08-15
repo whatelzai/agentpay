@@ -4,7 +4,12 @@ import {
   ListToolsRequestSchema,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ping, proposePurchase, executePurchase } from "../lib/mcp/tools/index";
+import {
+  ping,
+  proposePurchase,
+  executePurchase,
+  getReceiptTool,
+} from "../lib/mcp/tools/index";
 import type { ToolContext } from "../lib/mcp/tools/types";
 import pkg from "../../package.json";
 
@@ -77,6 +82,21 @@ export const AGENTPAY_TOOLS = [
       required: ["confirmation_token", "merchant", "amount_sgd"],
     },
   },
+  {
+    name: "get_receipt",
+    description:
+      "Fetch the receipt of a Mint Gate outcome — the proof chain of a mint (signed Tuple → settlement tx → Snowtrace link) or the signed Block Receipt of a refusal (requested vs confirmed, reason). Omit receipt_id for the most recent receipt. Receipts contain no card credentials.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        receipt_id: {
+          type: "string",
+          description:
+            "Receipt id from an execute_purchase result (e.g. rcpt_…). Omit for the latest receipt.",
+        },
+      },
+    },
+  },
 ];
 
 export function buildAgentPayServer(ctx: ToolContext): Server {
@@ -104,6 +124,8 @@ export function buildAgentPayServer(ctx: ToolContext): Server {
           return await proposePurchase(ctx, a);
         case "execute_purchase":
           return await executePurchase(ctx, a);
+        case "get_receipt":
+          return await getReceiptTool(ctx, a);
         default:
           throw new Error(`unknown tool: ${name}`);
       }
