@@ -126,11 +126,11 @@ export default function Home() {
 # health check
 agentpay ping
 
-# request a signed confirmation URL
-agentpay confirm -m "Starbucks" -a 5.50
+# propose a purchase — get a signed confirmation URL
+agentpay propose -m "Starbucks" -a 5.50
 
-# after signing, mint a card against the token
-agentpay mint -t <base64-token> -m "Starbucks" -a 5.50`}
+# after signing, execute the purchase against the token
+agentpay execute -t <base64-token> -m "Starbucks" -a 5.50`}
               </pre>
               <p className="text-sm text-neutral-500 mt-3">
                 Or one-shot without install:{" "}

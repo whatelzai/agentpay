@@ -20,9 +20,9 @@ program
   });
 
 program
-  .command("confirm")
+  .command("propose")
   .description(
-    "Request a signed confirmation URL for a purchase. Prints the URL for the user to open and sign.",
+    "Propose a purchase — prints a confirmation URL for the user to open and sign.",
   )
   .requiredOption("-m, --merchant <name>", "Merchant to purchase from")
   .requiredOption("-a, --amount <sgd>", "Amount in SGD", parseFloat)
@@ -40,7 +40,7 @@ program
       expiry: number;
       endpoint: string;
     }) => {
-      await callTool(opts.endpoint, "confirm_purchase", {
+      await callTool(opts.endpoint, "propose_purchase", {
         merchant: opts.merchant,
         amount_sgd: opts.amount,
         expiry_seconds: opts.expiry,
@@ -49,9 +49,9 @@ program
   );
 
 program
-  .command("mint")
+  .command("execute")
   .description(
-    "Request a card mint against a signed confirmation_token. Verifies signature + (merchant, amount) match. Prompt-injection defence in action.",
+    "Execute a confirmed purchase against a signed confirmation_token. Verifies signature + (merchant, amount) match. Prompt-injection defence in action.",
   )
   .requiredOption(
     "-t, --token <base64>",
@@ -74,13 +74,41 @@ program
       amount: number;
       endpoint: string;
     }) => {
-      await callTool(opts.endpoint, "request_card_mint", {
+      await callTool(opts.endpoint, "execute_purchase", {
         confirmation_token: opts.token,
         merchant: opts.merchant,
         amount_sgd: opts.amount,
       });
     },
   );
+
+program
+  .command("confirmation")
+  .description(
+    "Poll for the user's signed confirmation token by request id (from propose).",
+  )
+  .requiredOption("-r, --request <request_id>", "Request id (req_…) from propose")
+  .option("-e, --endpoint <url>", "MCP endpoint URL", DEFAULT_ENDPOINT)
+  .action(async (opts: { request: string; endpoint: string }) => {
+    await callTool(opts.endpoint, "get_confirmation", {
+      request_id: opts.request,
+    });
+  });
+
+program
+  .command("receipt")
+  .description(
+    "Fetch a Mint Gate receipt — proof chain of a mint, or the signed Block Receipt of a refusal. Omit --id for the latest.",
+  )
+  .option("-i, --id <receipt_id>", "Receipt id (rcpt_…) from an execute result")
+  .option("-e, --endpoint <url>", "MCP endpoint URL", DEFAULT_ENDPOINT)
+  .action(async (opts: { id?: string; endpoint: string }) => {
+    await callTool(
+      opts.endpoint,
+      "get_receipt",
+      opts.id ? { receipt_id: opts.id } : {},
+    );
+  });
 
 async function callTool(
   endpoint: string,

@@ -36,7 +36,7 @@ Use these words, in code and in conversation. One meaning each.
 | **Confirmation** | The EIP-712 typed-data signature over the Tuple. Made by the user's wallet on the `/confirm` page. |
 | **Confirmation Token** | Base64url string that carries the Tuple + signature + signer address. Travels through the agent; tampering breaks the signature. |
 | **Binding** | The rule that a mint request must match the signed Tuple exactly. The core of AgentPay. |
-| **Mint Gate** | The `request_card_mint` tool. Verifies the Binding, then (phase 3c) calls StraitsX. |
+| **Mint Gate** | The `execute_purchase` tool (formerly `request_card_mint`). Verifies the Binding, then (phase 3c) calls StraitsX. |
 | **Block Receipt** | Signed, logged record of a refused mint: requested vs confirmed, mismatch, REFUSED. (Planned.) |
 | **Scope** | The limits carried by a minted card: value, expiry, (merchant lock — not yet found in the StraitsX card, see SIG-020). |
 | **The Seam** | The bridge from a self-custody XSGD balance to a funded card: one EIP-3009 signature, facilitator pulls, card is funded. Proven live in SIG-020. |

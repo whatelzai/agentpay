@@ -21,13 +21,16 @@ export function ConfirmClient({
   merchant,
   amount,
   expirySeconds,
+  requestId,
 }: {
   merchant: string;
   amount: string;
   expirySeconds: string;
+  requestId?: string;
 }) {
   const [address, setAddress] = useState<`0x${string}` | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [delivery, setDelivery] = useState<"sent" | "failed" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -97,6 +100,20 @@ export function ConfirmClient({
         signer: address,
       });
       setToken(encoded);
+
+      // Hand the token to the agent automatically (fallback: manual copy).
+      if (requestId) {
+        try {
+          const r = await fetch(`/api/confirmations/${requestId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: encoded }),
+          });
+          setDelivery(r.ok ? "sent" : "failed");
+        } catch {
+          setDelivery("failed");
+        }
+      }
     } catch (e) {
       setError(`Sign failed: ${(e as Error).message}`);
     } finally {
@@ -141,10 +158,22 @@ export function ConfirmClient({
 
       {token && (
         <div className="space-y-3">
-          <p className="text-sm text-emerald-400">
-            ✓ Signed. Copy the token below and paste it back into your agent&apos;s
-            chat.
-          </p>
+          {delivery === "sent" ? (
+            <p className="text-sm text-emerald-400">
+              ✓ Signed and delivered to your agent. It will collect the
+              confirmation in a few seconds — you can close this page.
+            </p>
+          ) : delivery === "failed" ? (
+            <p className="text-sm text-amber-400">
+              ✓ Signed, but automatic delivery failed. Copy the token below and
+              paste it back into your agent&apos;s chat.
+            </p>
+          ) : (
+            <p className="text-sm text-emerald-400">
+              ✓ Signed. Copy the token below and paste it back into your
+              agent&apos;s chat.
+            </p>
+          )}
           <div className="border border-neutral-800 rounded p-3 bg-neutral-900">
             <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">
               Confirmation token
@@ -160,7 +189,7 @@ export function ConfirmClient({
             Copy token to clipboard
           </button>
           <p className="text-xs text-neutral-500 mt-4">
-            Ask your agent: <em className="text-neutral-300">&ldquo;Call the AgentPay request_card_mint tool with confirmation_token=&lt;paste&gt;, merchant=&ldquo;{merchant}&rdquo;, amount_sgd={amount}.&rdquo;</em>
+            Ask your agent: <em className="text-neutral-300">&ldquo;Call the AgentPay execute_purchase tool with confirmation_token=&lt;paste&gt;, merchant=&ldquo;{merchant}&rdquo;, amount_sgd={amount}.&rdquo;</em>
           </p>
         </div>
       )}
