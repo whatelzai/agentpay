@@ -46,9 +46,17 @@ When making architectural or scope decisions, refer to (and update) the vault. D
 
 ## MCP endpoints
 
-- **HTTP (production):** `https://agentpay-tan.vercel.app/api/mcp` — for Claude Desktop, Claude Code, Codex, any HTTP MCP client
-- **stdio (local):** `npm run mcp` — for CLI or local dev; wires into `~/.config/claude/claude_desktop_config.json` via `command`/`args` variant
+- **HTTP (production):** `https://agentpay-tan.vercel.app/api/mcp` — Streamable HTTP transport
+- **stdio (local):** `npm run mcp` — for the AgentPay CLI (phase 3) or local dev
 - Both share `buildAgentPayServer(ctx)` from `src/mcp/setup.ts` — tools defined once, exposed via both transports
+
+**Consumer connect targets (documented on landing page):**
+- **Claude.ai** (web + desktop, Pro/Max/Team/Enterprise) — Settings → Connectors → Add custom connector → paste HTTP URL
+- **Codex app** — Plugins → MCPs → Add → Connect to a custom MCP → Type: Streamable HTTP + URL
+
+**Not documented on landing page (deliberate):**
+- Claude Code CLI — will use our own `@aisystemresources/agentpay` CLI in phase 3, not the raw HTTP endpoint
+- Claude Desktop config-file variant — superseded by Claude.ai in-app connector UI
 
 ## Hard rules
 

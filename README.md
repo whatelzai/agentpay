@@ -33,10 +33,10 @@ Open http://localhost:3000.
 
 ## MCP endpoints
 
-- **HTTP:** `https://agentpay-tan.vercel.app/api/mcp` (Claude Desktop / Codex / any HTTP MCP client)
-- **stdio:** `npm run mcp` (local CLI use)
+- **HTTP:** `https://agentpay-tan.vercel.app/api/mcp` (Streamable HTTP transport)
+- **stdio:** `npm run mcp` (for the AgentPay CLI in phase 3, or local dev)
 
-Point your agent at the endpoint — instructions live on the landing page.
+Consumer connect targets (documented on the landing page): **Claude.ai** (in-app Connectors UI) and **Codex app** (Plugins → MCPs → custom MCP). Claude Code CLI users get a native `@aisystemresources/agentpay` package in phase 3.
 
 ## Branches
 
