@@ -12,6 +12,7 @@ import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { AGENTPAY_DOMAIN, CONFIRMATION_TYPES } from "../src/lib/binding/schema";
 import { encodeToken } from "../src/lib/binding/verify";
 import { executePurchase } from "../src/lib/mcp/tools/execute_purchase";
+import { getReceiptTool } from "../src/lib/mcp/tools/get_receipt";
 import {
   listReceipts,
   BLOCK_RECEIPT_DOMAIN,
@@ -300,7 +301,33 @@ async function main() {
     }
   }
 
-  console.log("S10 — REDACTION SWEEP: no credential material in any agent-visible output");
+  console.log("S10 — get_receipt returns the proof chain / the signed refusal");
+  {
+    const latest = await getReceiptTool(ctx, {});
+    const latestText = latest.content
+      .map((c) => (c.type === "text" ? c.text : ""))
+      .join("\n");
+    allResults.push(latestText);
+    check("latest receipt is the S8 retry mint", latestText.includes("MINTED"));
+    check("chain link 2: settlement tx", latestText.includes(FAKE_TX));
+    check("chain link 3: snowtrace", latestText.includes("snowtrace.io/tx/"));
+
+    const refusal = [...listReceipts()]
+      .reverse()
+      .find((r): r is BlockReceipt => r.type === "REFUSED");
+    const byId = await getReceiptTool(ctx, { receipt_id: refusal?.id });
+    const byIdText = byId.content
+      .map((c) => (c.type === "text" ? c.text : ""))
+      .join("\n");
+    allResults.push(byIdText);
+    check("refusal fetched by id", byIdText.includes("REFUSED"));
+    check("refusal carries the signature", byIdText.includes(refusal?.signature ?? "__none__"));
+
+    const missing = await getReceiptTool(ctx, { receipt_id: "rcpt_nope" });
+    check("unknown id errors cleanly", missing.isError === true);
+  }
+
+  console.log("S11 — REDACTION SWEEP: no credential material in any agent-visible output");
   {
     const everything = JSON.stringify(allResults) + JSON.stringify(listReceipts());
     check("no card_html", !everything.includes("card_html"));
