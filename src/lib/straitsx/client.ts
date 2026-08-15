@@ -49,7 +49,11 @@ export type MintSuccess = {
   iframeUrl?: string;
 };
 
-export type MintFailure = { ok: false; reason: string };
+// paymentAttempted separates the two failure worlds: before the paid retry
+// (nothing signed or sent — retry is free) vs after (the facilitator may
+// have settled on-chain even though the response failed — retry can double-
+// spend; verify the chain first).
+export type MintFailure = { ok: false; reason: string; paymentAttempted: boolean };
 export type MintResult = MintSuccess | MintFailure;
 
 export function straitsxEnv(): StraitsXEnv {
@@ -76,7 +80,7 @@ export function serverWalletAccount() {
 export async function mintCard(req: MintRequest): Promise<MintResult> {
   const account = serverWalletAccount();
   if (!account) {
-    return { ok: false, reason: "server wallet key is not configured" };
+    return { ok: false, reason: "server wallet key is not configured", paymentAttempted: false };
   }
 
   const url = `https://card.straitsx.ai/${req.env}/cardapi/issue_card`;
@@ -110,35 +114,36 @@ export async function mintCard(req: MintRequest): Promise<MintResult> {
     status = r1.status;
     challenge = await r1.json();
   } catch (e) {
-    return { ok: false, reason: `challenge request failed: ${(e as Error).message}` };
+    return { ok: false, reason: `challenge request failed: ${(e as Error).message}`, paymentAttempted: false };
   }
   const acc = challenge.accepts?.[0];
   if (status !== 402 || !acc) {
-    return { ok: false, reason: `expected an HTTP 402 challenge, got HTTP ${status}` };
+    return { ok: false, reason: `expected an HTTP 402 challenge, got HTTP ${status}`, paymentAttempted: false };
   }
 
   // Step 2 — refuse to sign unless the challenge matches the Tuple exactly.
   const expectedUnits = req.amountCents * XSGD_UNITS_PER_CENT;
   if (acc.chainId !== STRAITSX_CHAIN_ID[req.env]) {
-    return { ok: false, reason: `challenge chainId ${acc.chainId} != expected ${STRAITSX_CHAIN_ID[req.env]}` };
+    return { ok: false, reason: `challenge chainId ${acc.chainId} != expected ${STRAITSX_CHAIN_ID[req.env]}`, paymentAttempted: false };
   }
   if (acc.asset?.toLowerCase() !== XSGD_ASSET[req.env].toLowerCase()) {
-    return { ok: false, reason: `challenge asset ${acc.asset} is not the expected XSGD contract` };
+    return { ok: false, reason: `challenge asset ${acc.asset} is not the expected XSGD contract`, paymentAttempted: false };
   }
   let demandedUnits: bigint;
   try {
     demandedUnits = BigInt(acc.amount ?? "");
   } catch {
-    return { ok: false, reason: `challenge amount is not parseable: ${acc.amount}` };
+    return { ok: false, reason: `challenge amount is not parseable: ${acc.amount}`, paymentAttempted: false };
   }
   if (demandedUnits !== expectedUnits) {
     return {
       ok: false,
       reason: `challenge demands ${demandedUnits} XSGD units; the confirmed Tuple allows exactly ${expectedUnits}`,
+      paymentAttempted: false,
     };
   }
   if (!acc.payTo) {
-    return { ok: false, reason: "challenge has no payTo address" };
+    return { ok: false, reason: "challenge has no payTo address", paymentAttempted: false };
   }
 
   // Step 3 — sign EIP-3009 TransferWithAuthorization for exactly the demand.
@@ -193,22 +198,51 @@ export async function mintCard(req: MintRequest): Promise<MintResult> {
   const header = Buffer.from(JSON.stringify(paymentPayload)).toString("base64");
 
   // Step 4 — the paid retry. The facilitator settles on-chain first, then
-  // returns the card (SIG-020).
+  // returns the card (SIG-020). From here on, every failure is
+  // paymentAttempted: true — the XSGD may already be gone.
   let r2: Response;
-  let card: Record<string, unknown>;
+  let rawText: string;
   try {
     r2 = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "PAYMENT-SIGNATURE": header },
       body,
     });
-    card = (await r2.json()) as Record<string, unknown>;
+    rawText = await r2.text();
   } catch (e) {
-    return { ok: false, reason: `paid mint request failed: ${(e as Error).message}` };
+    return {
+      ok: false,
+      reason: `paid mint request failed: ${(e as Error).message}`,
+      paymentAttempted: true,
+    };
+  }
+  let card: Record<string, unknown>;
+  try {
+    card = JSON.parse(rawText) as Record<string, unknown>;
+  } catch {
+    card = {};
   }
   if (r2.status !== 200) {
-    const message = typeof card.message === "string" ? card.message : "no error message";
-    return { ok: false, reason: `mint rejected: HTTP ${r2.status} — ${message}` };
+    // Error responses carry no card credentials; keep them for diagnosis.
+    const pr =
+      r2.headers.get("payment-response") ?? r2.headers.get("PAYMENT-RESPONSE");
+    let prDecoded = "";
+    if (pr) {
+      try {
+        prDecoded = Buffer.from(pr, "base64").toString("utf8");
+      } catch {
+        prDecoded = pr;
+      }
+    }
+    const detail = [
+      prDecoded ? `PAYMENT-RESPONSE: ${prDecoded.slice(0, 300)}` : "no PAYMENT-RESPONSE header",
+      rawText ? `body: ${rawText.slice(0, 300)}` : "empty body",
+    ].join(" · ");
+    return {
+      ok: false,
+      reason: `mint rejected: HTTP ${r2.status} — ${detail}`,
+      paymentAttempted: true,
+    };
   }
 
   const settlementTx =
@@ -216,7 +250,11 @@ export async function mintCard(req: MintRequest): Promise<MintResult> {
   const cardOpaqueId =
     typeof card.card_opaque_id === "string" ? card.card_opaque_id : null;
   if (!settlementTx || !cardOpaqueId) {
-    return { ok: false, reason: "mint response missing settlement_tx or card_opaque_id" };
+    return {
+      ok: false,
+      reason: "mint response missing settlement_tx or card_opaque_id",
+      paymentAttempted: true,
+    };
   }
 
   return {

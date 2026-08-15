@@ -166,11 +166,25 @@ export async function executePurchase(
   });
 
   if (!mint.ok) {
-    // Rail failure, not a Binding refusal: the confirmation is not consumed.
-    releaseNonce(decoded.nonce);
     console.error(`[agentpay] mint failed at the rail: ${mint.reason}`);
+    if (!mint.paymentAttempted) {
+      // Failed before any payment was signed or sent: retry is free.
+      releaseNonce(decoded.nonce);
+      return refusal(
+        `Error: the mint failed at the rail — ${mint.reason}\nNo payment was sent. Your confirmation was NOT consumed; it is safe to retry until it expires.`,
+      );
+    }
+    // Payment was sent; the facilitator settles on-chain BEFORE returning the
+    // card, so the XSGD may be gone even though this response failed. Keep
+    // the nonce consumed — an automatic retry could pay twice.
     return refusal(
-      `Error: the mint failed at the rail — ${mint.reason}\nYour confirmation was NOT consumed; it is safe to retry until it expires.`,
+      [
+        `Error: the rail failed AFTER payment was sent — ${mint.reason}`,
+        "",
+        "The payment may have settled on-chain even though no card was returned.",
+        "Do NOT retry with this confirmation — it is consumed to prevent a double spend.",
+        "A human must verify the wallet's on-chain balance and contact StraitsX with the settlement transaction before any new attempt.",
+      ].join("\n"),
     );
   }
 
