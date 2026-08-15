@@ -83,6 +83,19 @@ program
   );
 
 program
+  .command("confirmation")
+  .description(
+    "Poll for the user's signed confirmation token by request id (from propose).",
+  )
+  .requiredOption("-r, --request <request_id>", "Request id (req_…) from propose")
+  .option("-e, --endpoint <url>", "MCP endpoint URL", DEFAULT_ENDPOINT)
+  .action(async (opts: { request: string; endpoint: string }) => {
+    await callTool(opts.endpoint, "get_confirmation", {
+      request_id: opts.request,
+    });
+  });
+
+program
   .command("receipt")
   .description(
     "Fetch a Mint Gate receipt — proof chain of a mint, or the signed Block Receipt of a refusal. Omit --id for the latest.",

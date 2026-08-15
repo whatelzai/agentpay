@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolContext } from "./types";
 
@@ -23,12 +24,14 @@ export async function proposePurchase(
     };
   }
 
+  const requestId = `req_${randomBytes(8).toString("hex")}`;
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ?? "https://agentpay-tan.vercel.app";
   const params = new URLSearchParams({
     merchant,
     amount: String(amountSgd),
     expiry: String(expirySeconds),
+    rid: requestId,
   });
   const confirmationUrl = `${baseUrl}/confirm?${params.toString()}`;
 
@@ -41,9 +44,13 @@ export async function proposePurchase(
           "",
           confirmationUrl,
           "",
-          "The user will sign an EIP-712 typed data message binding (merchant, amount, expiry, nonce). After signing, they receive a base64 confirmation_token — ask them to paste it back into the chat.",
+          `request_id: ${requestId}`,
           "",
-          "Once you have the token, call execute_purchase(confirmation_token=<token>, merchant, amount_sgd). AgentPay recovers the signer, verifies expiry, and asserts (merchant, amount) in your mint request match the signed values. Divergence → refuses the mint with a visible diff.",
+          "The user will sign an EIP-712 typed data message binding (merchant, amount, expiry, nonce). The signed confirmation_token is delivered back to AgentPay automatically.",
+          "",
+          `After the user signs, poll get_confirmation(request_id="${requestId}") every few seconds to collect the token. Fallback: the user can also copy the token from the page and paste it into the chat.`,
+          "",
+          "Then call execute_purchase(confirmation_token=<token>, merchant, amount_sgd). AgentPay recovers the signer, verifies expiry, and asserts (merchant, amount) in your mint request match the signed values. Divergence → refuses the mint with a visible diff.",
         ].join("\n"),
       },
     ],

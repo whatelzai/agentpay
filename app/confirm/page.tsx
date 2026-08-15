@@ -4,6 +4,7 @@ type SearchParams = Promise<{
   merchant?: string;
   amount?: string;
   expiry?: string;
+  rid?: string;
 }>;
 
 export default async function Confirm({
@@ -11,7 +12,7 @@ export default async function Confirm({
 }: {
   searchParams: SearchParams;
 }) {
-  const { merchant, amount, expiry } = await searchParams;
+  const { merchant, amount, expiry, rid } = await searchParams;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -49,6 +50,7 @@ export default async function Confirm({
             merchant={merchant}
             amount={amount}
             expirySeconds={expiry ?? "300"}
+            requestId={rid}
           />
         ) : (
           <p className="text-sm text-red-400">
