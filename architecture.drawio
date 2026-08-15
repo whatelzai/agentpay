@@ -1,0 +1,86 @@
+<mxfile host="app.diagrams.net" modified="2026-08-15T00:00:00.000Z" agent="AgentPay" version="24.7.8" type="device">
+  <diagram id="agentpay-architecture" name="AgentPay architecture">
+    <mxGraphModel dx="1200" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="user" value="USER (human)&#10;Holds the wallet key. Signs the payment (EIP-3009)&#10;and the AgentPay v2 Confirmation (EIP-712)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=middle;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="340" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agent" value="AI AGENT (untrusted)&#10;Talks over MCP only. Tools: ping, list_products,&#10;propose_purchase, get_confirmation, execute_purchase, get_receipt." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=middle;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="500" y="40" width="360" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agentpay" value="AGENTPAY — this repo — Next.js on Vercel (agentpay-tan.vercel.app)" style="swimlane;rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;startSize=30;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="230" width="820" height="270" as="geometry" />
+        </mxCell>
+
+        <mxCell id="confirmPage" value="/confirm page&#10;Wallet UI. Makes the signed&#10;Confirmation Token." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="agentpay">
+          <mxGeometry x="20" y="50" width="245" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mcpServer" value="MCP server&#10;HTTP /api/mcp + stdio.&#10;One tool surface, two transports." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="agentpay">
+          <mxGeometry x="288" y="50" width="245" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="binding" value="Binding lib&#10;Verifies signer, payer, payment hash,&#10;expiry, replay nonce, exact Tuple match." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="agentpay">
+          <mxGeometry x="556" y="50" width="245" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mintGate" value="Mint Gate&#10;Tuple match → mint.&#10;Mismatch → REFUSE + field diff + signed Block Receipt." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="agentpay">
+          <mxGeometry x="20" y="160" width="380" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="adapter" value="Payment adapter (rail-neutral)&#10;StraitsX x402 now. Other rails can plug in later." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="agentpay">
+          <mxGeometry x="420" y="160" width="380" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="straitsx" value="STRAITSX — card.straitsx.ai (the Rail)&#10;x402 flow: POST issue_card → HTTP 402 challenge → retry with PAYMENT-SIGNATURE.&#10;Facilitator pulls XSGD on-chain, pays gas, mints a funded virtual card (Visa rails)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="580" width="820" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="avax" value="AVALANCHE C-CHAIN MAINNET (chainId 43114)&#10;XSGD token settles on-chain. ~2 second finality. The public tx hash is the proof." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="730" width="820" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="trustNote" value="TRUST BOUNDARY: the raw EIP-3009 payment signature NEVER reaches the agent.&#10;The browser posts it straight to AgentPay. AgentPay seals it (AES-256-GCM).&#10;The agent carries only an opaque capability. Even a prompt-injected agent cannot redirect the money." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="860" width="820" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="1. propose_purchase → returns /confirm URL" style="endArrow=classic;html=1;rounded=0;fontSize=11;exitX=0.35;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="agent" target="mcpServer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2" value="2–3. Opens URL. Signs exact payment + Confirmation" style="endArrow=classic;html=1;rounded=0;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="user" target="confirmPage">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" value="4. Sealed opaque capability (no raw signature inside)" style="endArrow=classic;html=1;rounded=0;dashed=1;fontSize=11;exitX=0.75;exitY=0;entryX=0.65;entryY=1;" edge="1" parent="1" source="mcpServer" target="agent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4" value="5. execute_purchase(capability, merchant, amount)" style="endArrow=classic;html=1;rounded=0;fontSize=11;exitX=0.9;exitY=1;entryX=0.9;entryY=0;" edge="1" parent="1" source="agent" target="binding">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e5" value="" style="endArrow=classic;html=1;rounded=0;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="binding" target="adapter">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e5b" value="all checks pass" style="endArrow=classic;html=1;rounded=0;fontSize=11;" edge="1" parent="1" source="mintGate" target="adapter">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e6" value="6. Match → submit the already-signed payment proof (x402)" style="endArrow=classic;html=1;rounded=0;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="agentpay" target="straitsx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" value="Settles XSGD on-chain first, then returns the card" style="endArrow=classic;html=1;rounded=0;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="straitsx" target="avax">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
